@@ -1,0 +1,10 @@
+{
+  "description": "SkillTrix is an inclusive education platform that empowers learners of all ages and skill levels to master programming through interactive courses, coding practice, and community support.",
+  "robots": {
+    "index": false
+  },
+  "accessibility": {
+    "addBypassLinks": false,
+    "ignoreReducedMotion": false
+  }
+}
