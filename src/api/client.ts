@@ -1,46 +1,50 @@
-import axios from "axios";
+import axios from "axios"
 
 const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL ||
-  "http://127.0.0.1:8000/api";
+  import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api"
 
 const api = axios.create({
   baseURL: API_BASE_URL,
+
   headers: {
     "Content-Type": "application/json",
   },
-});
+})
 
 // Add JWT automatically to every request
+
 api.interceptors.request.use(
   (config) => {
-    const accessToken = localStorage.getItem("access_token");
+    const accessToken = localStorage.getItem("access_token")
 
     if (accessToken) {
-      config.headers.Authorization = `Bearer ${accessToken}`;
+      config.headers.Authorization = `Bearer ${accessToken}`
     }
 
-    return config;
+    return config
   },
+
   (error) => {
-    return Promise.reject(error);
-  }
-);
+    return Promise.reject(error)
+  },
+)
 
 // Handle expired JWT
+
 api.interceptors.response.use(
   (response) => response,
 
   async (error) => {
     if (error.response?.status === 401) {
-      localStorage.removeItem("access_token");
-      localStorage.removeItem("refresh_token");
+      localStorage.removeItem("access_token")
 
-      window.location.href = "/login";
+      localStorage.removeItem("refresh_token")
+
+      window.location.href = "/login"
     }
 
-    return Promise.reject(error);
-  }
-);
+    return Promise.reject(error)
+  },
+)
 
-export default api;
+export default api

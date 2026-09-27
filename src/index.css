@@ -101,15 +101,122 @@ button, a, input, select, textarea {
   border-radius: 4px;
 }
 
-/* Code syntax highlight theme */
-.code-block {
+/* Code syntax highlight theme (Prism Dark & High Contrast) */
+.code-block,
+.code-editor,
+pre.code-editor,
+pre.code-block {
   font-family: var(--font-mono);
-  font-size: 0.875rem;
-  line-height: 1.7;
+  color: #f8fafc !important;
 }
-.token-keyword { color: #7C3AED; font-weight: 500; }
-.token-string { color: #059669; }
-.token-comment { color: #94A3B8; font-style: italic; }
-.token-function { color: #2563EB; }
-.token-number { color: #D97706; }
-.token-builtin { color: #0891B2; }
+
+.code-block code,
+.code-editor code {
+  color: inherit;
+}
+
+.token {
+  font-family: inherit;
+}
+
+/* Comments: Muted slate italic */
+.token.comment,
+.token.prolog,
+.token.doctype,
+.token.cdata {
+  color: #64748b !important;
+  font-style: italic;
+}
+
+/* Punctuation & Delimiters */
+.token.punctuation {
+  color: #94a3b8 !important;
+}
+
+/* Keywords: Vibrant violet/purple (def, return, class, public, static, void, int, if, for, etc.) */
+.token.keyword,
+.token.atrule,
+.token.rule {
+  color: #c084fc !important;
+  font-weight: 600;
+}
+
+/* Strings & Characters: Fresh emerald / green */
+.token.string,
+.token.char,
+.token.attr-value {
+  color: #4ade80 !important;
+}
+
+/* Python String Interpolation & f-strings */
+.token.string-interpolation,
+.token.triple-quoted-string {
+  color: #34d399 !important;
+}
+
+/* Numbers & Booleans: Warm amber / orange */
+.token.number,
+.token.boolean {
+  color: #fb923c !important;
+  font-weight: 500;
+}
+
+/* Functions & Methods: Electric sky blue */
+.token.function,
+.token.function-name {
+  color: #38bdf8 !important;
+  font-weight: 500;
+}
+
+/* Builtins, Classes & Types: Cyan / Teal (print, range, String, cout, vector, System, etc.) */
+.token.builtin,
+.token.class-name,
+.token.constant,
+.token.symbol {
+  color: #2dd4bf !important;
+  font-weight: 500;
+}
+
+/* C / C++ Preprocessor & Directives (#include, #define, <iostream>, <stdio.h>) */
+.token.macro,
+.token.directive-hash,
+.token.directive,
+.token.macro.property {
+  color: #f43f5e !important;
+  font-weight: 600;
+}
+
+.token.expression {
+  color: #38bdf8 !important;
+}
+
+/* Operators */
+.token.operator,
+.token.entity,
+.token.url {
+  color: #cbd5e1 !important;
+}
+
+/* Variables, Identifiers & Properties: Brilliant crisp white (18:1 contrast against dark IDE canvas) */
+.token.variable,
+.token.property,
+.token.parameter {
+  color: #f8fafc !important;
+  font-weight: 500;
+}
+
+/* HTML / XML Tags */
+.token.tag {
+  color: #f43f5e !important;
+  font-weight: 600;
+}
+
+.token.attr-name {
+  color: #fbbf24 !important;
+}
+
+/* Regex & Important */
+.token.regex,
+.token.important {
+  color: #f59e0b !important;
+}
