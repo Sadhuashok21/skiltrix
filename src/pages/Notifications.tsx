@@ -1,5 +1,7 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Link } from "react-router-dom"
+import { useSkiltrixData } from "../context/SkiltrixDataContext"
+import api from "../api/client"
 import {
   Trophy,
   MessageSquare,
@@ -96,13 +98,32 @@ const allNotifs = [
 ]
 
 const categories = ["All", "Learning", "Community", "Achievements"]
+type NotificationItem = Omit<(typeof allNotifs)[number], "id"> & { id: string | number }
 
 export default function Notifications() {
+  const { notifications: apiNotifications } = useSkiltrixData()
   const [activeCategory, setActiveCategory] = useState("All")
-  const [notifs, setNotifs] = useState(allNotifs)
+  const [notifs, setNotifs] = useState<NotificationItem[]>([])
 
-  const markAllRead = () =>
+  useEffect(() => {
+    const icons = { Achievements: Trophy, Community: MessageSquare, Learning: BookOpen, Internships: Briefcase, System: Bell }
+    setNotifs(apiNotifications.map((notice) => ({
+      id: notice.notification_id,
+      icon: icons[notice.category as keyof typeof icons] ?? Bell,
+      iconColor: "text-indigo-600 bg-indigo-50",
+      title: String(notice.title ?? "Notification"),
+      body: String(notice.body ?? ""),
+      time: notice.created_at ? new Date(String(notice.created_at)).toLocaleString() : "",
+      read: Boolean(notice.read),
+      category: String(notice.category ?? "System"),
+    })))
+  }, [apiNotifications])
+
+  const markAllRead = () => {
     setNotifs((n) => n.map((x) => ({ ...x, read: true })))
+    const userId = localStorage.getItem("user_id")
+    if (userId) void api.post("/actions/notifications/read/", { user_id: userId })
+  }
 
   const filtered = notifs.filter(
     (n) => activeCategory === "All" || n.category === activeCategory,
@@ -169,9 +190,9 @@ export default function Notifications() {
                 : "bg-white border-slate-200 hover:border-slate-300"
             }`}
             onClick={() =>
-              setNotifs((prev) =>
+              { setNotifs((prev) =>
                 prev.map((x) => (x.id === n.id ? { ...x, read: true } : x)),
-              )
+              ); const userId = localStorage.getItem("user_id"); if (userId) void api.patch(`/notifications/${n.id}/`, { read: true }, { params: { user_id: userId } }) }
             }
           >
             <div

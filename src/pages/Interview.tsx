@@ -1,6 +1,7 @@
 import { useState } from "react"
 import { Link } from "react-router-dom"
-import { interviewQs } from "../data/mockData"
+import type { interviewQs as exampleQuestions } from "../data/mockData"
+import { useSkiltrixData } from "../context/SkiltrixDataContext"
 import CodeBlock from "../components/CodeBlock"
 import { TechIcon } from "../components/TechIcons"
 import { AlertTriangle, Terminal, Target } from "lucide-react"
@@ -17,7 +18,20 @@ const categories = [
 ]
 
 export default function Interview() {
-  const [selectedQ, setSelectedQ] = useState<typeof interviewQs[0] | null>(null)
+  const { interviews: apiQuestions } = useSkiltrixData()
+  type InterviewQuestion = Omit<typeof exampleQuestions[number], "id"> & { id: string }
+  const interviewQs: InterviewQuestion[] = apiQuestions.map((item) => ({
+    id: item.interview_id,
+    topic: item.topic,
+    difficulty: item.difficulty,
+    question: item.question,
+    shortAnswer: item.short_answer,
+    explanation: item.explanation,
+    code: item.code,
+    tags: Array.isArray(item.tags) ? item.tags : [],
+  }))
+  const categories = [...new Set(interviewQs.map((question) => question.topic))].map((name) => ({ name, icon: name.toLowerCase(), count: interviewQs.filter((question) => question.topic === name).length }))
+  const [selectedQ, setSelectedQ] = useState<InterviewQuestion | null>(null)
 
   const [activeCategory, setActiveCategory] = useState("All")
 

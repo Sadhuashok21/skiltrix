@@ -1,6 +1,6 @@
-import { useState } from "react"
 import { Link } from "react-router-dom"
-import { courses, badges } from "../data/mockData"
+import { useSkiltrixData } from "../context/SkiltrixDataContext"
+import { mapCourse } from "../data/apiAdapters"
 import { TechIcon } from "../components/TechIcons"
 import {
   CheckCircle2,
@@ -116,45 +116,36 @@ const recommended = [
   },
 ]
 
-const statCards = [
-  {
-    label: "Day Streak",
-    value: "14",
-    icon: <Flame className="w-5 h-5 text-orange-500" />,
-    color: "text-orange-500",
-    sub: "Personal best!",
-  },
-  {
-    label: "XP Points",
-    value: "4,280",
-    icon: <Zap className="w-5 h-5 text-yellow-500" />,
-    color: "text-yellow-500",
-    sub: "Level 12",
-  },
-  {
-    label: "Problems Solved",
-    value: "47",
-    icon: <CheckCircle2 className="w-5 h-5 text-green-500" />,
-    color: "text-green-500",
-    sub: "This month",
-  },
-  {
-    label: "Quizzes Done",
-    value: "23",
-    icon: <Target className="w-5 h-5 text-indigo-500" />,
-    color: "text-indigo-500",
-    sub: "Avg: 84%",
-  },
-]
-
 export default function Dashboard() {
-  const [completedGoals, setCompletedGoals] = useState<number[]>([0, 3])
-
-  const toggleGoal = (i: number) => {
-    setCompletedGoals((prev) =>
-      prev.includes(i) ? prev.filter((x) => x !== i) : [...prev, i],
-    )
-  }
+  const { courses: apiCourses, problems, quizzes, videos, enrollments, badges: apiBadges, profile, progress, activity } = useSkiltrixData()
+  const courses = enrollments.map((item) => mapCourse(item.course, item.progress_percent))
+  const earnedNames = (profile?.earned_badges as string[] | undefined) ?? []
+  const badges = apiBadges.map((badge) => ({ name: String(badge.name ?? "Badge"), icon: String(badge.icon ?? "trophy"), earned: earnedNames.includes(String(badge.name)) }))
+  const statCards = [
+    { label: "Day Streak", value: String(progress?.streak ?? 0), icon: <Flame className="w-5 h-5 text-orange-500" />, color: "text-orange-500", sub: "Current streak" },
+    { label: "XP Points", value: String(progress?.xp ?? 0), icon: <Zap className="w-5 h-5 text-yellow-500" />, color: "text-yellow-500", sub: "Earned XP" },
+    { label: "Problems Solved", value: String(progress?.problems_solved ?? 0), icon: <CheckCircle2 className="w-5 h-5 text-green-500" />, color: "text-green-500", sub: "All time" },
+    { label: "Quizzes Passed", value: String(progress?.quizzes_passed ?? 0), icon: <Target className="w-5 h-5 text-indigo-500" />, color: "text-indigo-500", sub: "All time" },
+  ]
+  const recentActivity = activity.map((item, index) => ({
+    icon: <CheckCircle2 className="w-4 h-4" />,
+    text: `${item.problems_solved ?? 0} problems, ${item.quizzes_completed ?? 0} quizzes`,
+    sub: `${item.minutes_spent ?? 0} minutes · ${item.xp_earned ?? 0} XP`,
+    time: item.date ? new Date(String(item.date)).toLocaleDateString() : `Activity ${index + 1}`,
+    color: "bg-indigo-100 text-indigo-600",
+  }))
+  const recommended = [
+    ...apiCourses.slice(0, 1).map((course) => ({ type: "Course", icon: <BookOpen className="w-5 h-5 text-indigo-600" />, title: course.name, desc: course.type, badge: "Course", to: `/courses/${course.course_id}` })),
+    ...problems.slice(0, 1).map((problem) => ({ type: "Problem", icon: <Code2 className="w-5 h-5 text-indigo-600" />, title: problem.title, desc: problem.difficulty, badge: "Practice", to: "/practice" })),
+    ...quizzes.slice(0, 1).map((quiz) => ({ type: "Quiz", icon: <Target className="w-5 h-5 text-indigo-600" />, title: quiz.title, desc: `${quiz.total_questions} questions`, badge: "Quiz", to: "/quizzes" })),
+    ...videos.slice(0, 1).map((video) => ({ type: "Video", icon: <Play className="w-5 h-5 text-indigo-600 fill-current" />, title: video.title, desc: video.course_name || "Video lesson", badge: "Watch", to: "/videos" })),
+  ]
+  const goals = [
+    { text: apiCourses[0] ? `Enroll in ${apiCourses[0].name}` : "Explore the course catalog", done: enrollments.length > 0, xp: 50, progress: enrollments.length ? "Enrolled" : undefined, to: apiCourses[0] ? `/courses/${apiCourses[0].course_id}` : "/courses" },
+    { text: "Solve a coding problem", done: Number(progress?.problems_solved ?? 0) > 0, xp: 100, to: "/practice" },
+    { text: "Pass a quiz", done: Number(progress?.quizzes_passed ?? 0) > 0, xp: 80, to: "/quizzes" },
+  ]
+  const completedGoals = goals.map((goal, index) => goal.done ? index : -1).filter((index) => index >= 0)
 
   return (
     <div className="max-w-[1440px] mx-auto px-4 lg:px-8 py-8">
@@ -393,9 +384,9 @@ export default function Dashboard() {
             <ProgressBar value={(completedGoals.length / goals.length) * 100} />
             <div className="space-y-2 mt-4">
               {goals.map((g, i) => (
-                <button
+                <Link
                   key={i}
-                  onClick={() => toggleGoal(i)}
+                  to={g.to}
                   className={`w-full flex items-start gap-3 p-2.5 rounded-lg text-left transition-colors ${
                     completedGoals.includes(i)
                       ? "bg-green-50"
@@ -444,7 +435,7 @@ export default function Dashboard() {
                   <span className="text-xs font-semibold text-amber-500 shrink-0">
                     +{g.xp} XP
                   </span>
-                </button>
+                </Link>
               ))}
             </div>
           </div>
@@ -456,7 +447,7 @@ export default function Dashboard() {
                 Your Level
               </span>
               <span className="text-xs bg-white/20 px-2 py-0.5 rounded-full">
-                Level 12
+                Level {Math.floor(Number(progress?.xp ?? 0) / 1000) + 1}
               </span>
             </div>
             <div

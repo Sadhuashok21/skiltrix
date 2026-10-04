@@ -107,6 +107,18 @@ export function HtmlIcon({ className = "w-5 h-5", size, ...props }: IconProps) {
   );
 }
 
+export function PhpIcon({ className = "w-5 h-5", size, ...props }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className={className} {...props}>
+      <ellipse cx="12" cy="12" rx="10" ry="7" />
+      <path d="M7 10h2a1.5 1.5 0 0 1 0 3H7v3" />
+      <path d="M12 10v6" />
+      <path d="M12 13h1.5a1.5 1.5 0 0 0 0-3H12" />
+      <path d="M17 10h2a1.5 1.5 0 0 1 0 3h-2v3" />
+    </svg>
+  );
+}
+
 export function ReactIcon({ className = "w-5 h-5", size, ...props }: IconProps) {
   return (
     <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="currentColor" strokeWidth={1.8} className={className} {...props}>
@@ -263,6 +275,8 @@ export function TechIcon({
       return <HtmlIcon className={className} />;
     case "react":
       return <ReactIcon className={className} />;
+    case "php":
+      return <PhpIcon className={className} />;
     case "dsa":
       return <DsaIcon className={className} />;
     case "git":

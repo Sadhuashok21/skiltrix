@@ -1,35 +1,26 @@
 import api from "./client"
+import { asList, asRecord } from "./data"
+
+export interface ApiVideo {
+  video_id: string
+  title: string
+  description: string
+  video: string
+  image: string
+  like: number
+  share: number
+  views: number
+  course_name?: string
+  created_at: string
+  subtitles?: { language_code: string; label: string; vtt_url: string }[]
+}
 
 export const getVideos = async () => {
-  const response = await api.get("/videos/")
-
-  return response.data
+  const { data } = await api.get("/videos/")
+  return asList<ApiVideo>(data, "videos")
 }
 
-export const getVideo = async (id: number) => {
-  const response = await api.get(`/videos/${id}/`)
-
-  return response.data
-}
-
-export const likeVideo = async (id: number) => {
-  const response = await api.post(`/videos/${id}/like/`)
-
-  return response.data
-}
-
-export const commentVideo = async (
-  id: number,
-
-  text: string,
-) => {
-  const response = await api.post(
-    `/videos/${id}/comments/`,
-
-    {
-      text,
-    },
-  )
-
-  return response.data
+export const getVideo = async (id: string | number) => {
+  const { data } = await api.get(`/videos/${encodeURIComponent(String(id))}/`)
+  return asRecord<ApiVideo>(data, "video")
 }

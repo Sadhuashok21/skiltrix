@@ -1,25 +1,16 @@
 import { useState, useEffect } from "react"
 import { getVideos } from "../api/videos"
-import InVideo, { Video, DEFAULT_VIDEOS } from "./InVideo"
-
-const tags = [
-  "All",
-  "Python",
-  "JavaScript",
-  "React",
-  "DSA",
-  "Java",
-  "CSS",
-  "SQL",
-  "HTML",
-  "Django",
-]
+import type { ApiVideo } from "../api/videos"
+import InVideo, { Video } from "./InVideo"
 
 export default function Videos() {
   const [activeTag, setActiveTag] = useState("All")
   const [view, setView] = useState<"list" | "watch">("list")
-  const [videos, setVideos] = useState<Video[]>(DEFAULT_VIDEOS)
-  const [selectedVideo, setSelectedVideo] = useState<Video>(DEFAULT_VIDEOS[0])
+  const [videos, setVideos] = useState<Video[]>([])
+  const [selectedVideo, setSelectedVideo] = useState<Video | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState("")
+  const tags = ["All", ...new Set(videos.map((video) => video.tag).filter(Boolean))]
 
   useEffect(() => {
     loadVideos()
@@ -27,14 +18,14 @@ export default function Videos() {
 
   const loadVideos = async () => {
     try {
-      const response = await getVideos()
-      if (Array.isArray(response) && response.length > 0) {
-        setVideos(response)
-        setSelectedVideo(response[0])
-      }
-    } catch (error) {
-      // Backend not running or offline: fallback to DEFAULT_VIDEOS
-      console.log("Using default video catalog", error)
+      const records = await getVideos()
+      const mapped = records.map(mapVideo)
+      setVideos(mapped)
+      setSelectedVideo(mapped[0] ?? null)
+    } catch {
+      setError("Video lessons could not be loaded. Check the API connection and try again.")
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -43,6 +34,7 @@ export default function Videos() {
   )
 
   if (view === "watch") {
+    if (!selectedVideo) return null
     return (
       <InVideo
         selectedVideo={selectedVideo}
@@ -53,7 +45,17 @@ export default function Videos() {
     )
   }
 
-  const activeHeaderVideo = selectedVideo || videos[0] || DEFAULT_VIDEOS[0]
+  const activeHeaderVideo = selectedVideo ?? videos[0]!
+
+  if (loading || error || videos.length === 0) {
+    return (
+      <div className="max-w-[1440px] mx-auto px-4 lg:px-8 py-16 text-center">
+        <h1 className="text-3xl font-extrabold text-slate-900 mb-2">Video Lessons</h1>
+        <p className="text-slate-500">{loading ? "Loading lessons…" : error || "No video lessons are available yet."}</p>
+        {error && <button onClick={() => { setLoading(true); setError(""); void loadVideos() }} className="mt-4 text-indigo-600 font-semibold">Try again</button>}
+      </div>
+    )
+  }
 
   return (
     <div className="max-w-[1440px] mx-auto px-4 lg:px-8 py-8">
@@ -213,4 +215,21 @@ export default function Videos() {
       </div>
     </div>
   )
+}
+
+function mapVideo(record: ApiVideo): Video {
+  const mediaBase = import.meta.env.VITE_MEDIA_BASE_URL || "http://127.0.0.1:8000/media"
+  const mediaUrl = (value: string) => /^https?:\/\//i.test(value) ? value : `${mediaBase.replace(/\/$/, "")}/${value.replace(/^\//, "")}`
+  return {
+    id: record.video_id,
+    title: record.title,
+    instructor: record.course_name || "SkilTrix",
+    duration: "—",
+    views: String(record.views ?? 0),
+    likes: String(record.like ?? 0),
+    tag: record.course_name || "Lessons",
+    thumb: mediaUrl(record.image),
+    date: record.created_at ? new Date(record.created_at).toLocaleDateString() : "",
+    videoUrl: mediaUrl(record.video),
+  }
 }

@@ -1,71 +1,41 @@
-import api from "./client"
+import axios from "axios"
+import { API_ORIGIN } from "./client"
 
-export interface LoginData {
-  username: string
+const authApi = axios.create({
+  baseURL: API_ORIGIN,
+  withCredentials: true,
+  headers: { "Content-Type": "application/json" },
+})
 
-  password: string
-}
-
-export interface RegisterData {
-  username: string
-
-  email: string
-
-  password: string
-
-  password2: string
-}
-
-export interface LoginResponse {
-  access: string
-
-  refresh: string
-
-  user: {
-    id: number
-
-    username: string
-
-    email: string
+export const getGlobalSignInUrl = (returnTo?: string) => {
+  let target = returnTo || (window.location.pathname + window.location.search + window.location.hash)
+  let safeReturnTo = "/"
+  try {
+    if (target.startsWith("/") && !target.startsWith("//") && !target.includes("\\")) {
+      safeReturnTo = target
+    } else {
+      const parsed = new URL(target, window.location.origin)
+      if (parsed.origin === window.location.origin) {
+        safeReturnTo = parsed.pathname + parsed.search + parsed.hash
+      }
+    }
+  } catch {
+    safeReturnTo = "/"
   }
-}
-
-export const loginUser = async (data: LoginData): Promise<LoginResponse> => {
-  const response = await api.post<LoginResponse>(
-    "/auth/login/",
-
-    data,
-  )
-
-  localStorage.setItem(
-    "access_token",
-
-    response.data.access,
-  )
-
-  localStorage.setItem(
-    "refresh_token",
-
-    response.data.refresh,
-  )
-
-  return response.data
-}
-
-export const registerUser = async (data: RegisterData) => {
-  const response = await api.post(
-    "/auth/register/",
-
-    data,
-  )
-
-  return response.data
+  const signInUrl = new URL("/login", window.location.origin)
+  signInUrl.searchParams.set("returnTo", safeReturnTo)
+  return signInUrl.toString()
 }
 
 export const logoutUser = () => {
+  const csrfToken = document.cookie.split(";").map((part) => part.trim()).find((part) => part.startsWith("csrftoken="))?.split("=").slice(1).join("=")
+  const signout = authApi.post("/apps/skiltrix/api/actions/logout/", {}, {
+    headers: csrfToken ? { "X-CSRFToken": decodeURIComponent(csrfToken) } : undefined,
+  })
+  localStorage.removeItem("user_id")
   localStorage.removeItem("access_token")
-
   localStorage.removeItem("refresh_token")
-
-  window.location.href = "/login"
+  localStorage.removeItem("skiltrix_access_token")
+  sessionStorage.removeItem("skiltrix_access_token")
+  return signout.catch(() => undefined).finally(() => { window.location.href = "/" })
 }

@@ -1,6 +1,8 @@
 import { useState } from "react"
 import { Link } from "react-router-dom"
-import { quizTopics } from "../data/mockData"
+import { useSkiltrixData } from "../context/SkiltrixDataContext"
+import { mapQuiz, type QuizCardData } from "../data/apiAdapters"
+import { getQuiz, submitQuiz, type ApiQuiz } from "../api/quizzes"
 import { TechIcon } from "../components/TechIcons"
 import {
   Trophy,
@@ -110,23 +112,38 @@ const questions = [
 type QuizState = "browse" | "quiz" | "results"
 
 export default function Quizzes() {
+  const { quizzes: apiQuizzes, refresh } = useSkiltrixData()
+  const quizTopics = apiQuizzes.map(mapQuiz)
   const [state, setState] = useState<QuizState>("browse")
-  const [selectedQuiz, setSelectedQuiz] = useState(quizTopics[0])
+  const [selectedQuiz, setSelectedQuiz] = useState<QuizCardData | null>(null)
+  const [quizData, setQuizData] = useState<ApiQuiz | null>(null)
+  const [result, setResult] = useState<{ score: number; percentage: number; correct: number; total: number } | null>(null)
+  const questions = (quizData?.questions ?? []).map((q) => ({ q: q.question_text, options: q.options.map((option) => option.option_text), questionId: q.question_id, optionIds: q.options.map((option) => option.option_id), explanation: "" }))
   const [currentQ, setCurrentQ] = useState(0)
   const [selected, setSelected] = useState<number | null>(null)
-  const [answers, setAnswers] = useState<(number | null)[]>(
-    new Array(questions.length).fill(null),
-  )
+  const [answers, setAnswers] = useState<(number | null)[]>([])
   const [marked, setMarked] = useState<number[]>([])
   const [showExplain, setShowExplain] = useState(false)
+  const [apiError, setApiError] = useState("")
 
-  const startQuiz = (q: typeof quizTopics[0]) => {
+  const startQuiz = async (q: QuizCardData) => {
     setSelectedQuiz(q)
+    setQuizData(null)
+    setResult(null)
     setCurrentQ(0)
     setSelected(null)
-    setAnswers(new Array(questions.length).fill(null))
+    setAnswers(new Array(q.questions).fill(null))
     setMarked([])
-    setState("quiz")
+    try {
+      setApiError("")
+      const fullQuiz = await getQuiz(q.id)
+      setQuizData(fullQuiz)
+      setAnswers(new Array(fullQuiz.questions?.length ?? 0).fill(null))
+      if (fullQuiz.questions?.length) setState("quiz")
+    } catch {
+      setApiError("Quiz questions could not be loaded from the API.")
+      setState("browse")
+    }
   }
 
   const selectAnswer = (i: number) => {
@@ -145,12 +162,31 @@ export default function Quizzes() {
       setSelected(newAnswers[currentQ + 1])
       setShowExplain(false)
     } else {
-      setState("results")
+      void finishQuiz(newAnswers)
     }
   }
 
-  const score = answers.filter((a, i) => a === questions[i].answer).length
-  const pct = Math.round((score / questions.length) * 100)
+  const finishQuiz = async (submittedAnswers: (number | null)[]) => {
+    if (!quizData || !selectedQuiz) return
+    const userId = localStorage.getItem("user_id")
+    if (!userId) { setApiError("Sign in before submitting a quiz."); setState("browse"); return }
+    try {
+      const submitted = questions.flatMap((question, index) => {
+        const optionId = question.optionIds[submittedAnswers[index] ?? -1]
+        return optionId ? [{ question_id: question.questionId, selected_option_id: optionId }] : []
+      })
+      const response = await submitQuiz(userId, quizData.quiz_id, submitted)
+      setResult(response.result)
+      setState("results")
+      refresh()
+    } catch {
+      setApiError("Quiz results could not be submitted. Check your connection and try again.")
+      setState("browse")
+    }
+  }
+
+  const score = result?.correct ?? 0
+  const pct = result?.percentage ?? 0
 
   if (state === "results") {
     const grade =
@@ -202,8 +238,8 @@ export default function Quizzes() {
           {[
             { label: "Score", value: `${score}/${questions.length}` },
             { label: "Accuracy", value: `${pct}%` },
-            { label: "Time taken", value: "7m 23s" },
-            { label: "XP Earned", value: "+80 XP" },
+            { label: "Time taken", value: "—" },
+            { label: "XP Earned", value: `+${result?.score ?? 0} XP` },
           ].map((s) => (
             <div
               key={s.label}
@@ -223,41 +259,18 @@ export default function Quizzes() {
         {/* Review answers */}
         <div className="space-y-4 mb-8">
           {questions.map((q, i) => {
-            const correct = answers[i] === q.answer
+            const chosen = answers[i]
             return (
               <div
                 key={i}
-                className={`bg-white rounded-xl border p-4 ${
-                  correct ? "border-green-200" : "border-red-200"
-                }`}
+                className="bg-white rounded-xl border border-slate-200 p-4"
               >
                 <div className="flex items-start gap-3">
-                  <span
-                    className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
-                      correct
-                        ? "bg-green-100 text-green-700"
-                        : "bg-red-100 text-red-700"
-                    }`}
-                  >
-                    {correct ? <Check className="w-3.5 h-3.5" /> : <X className="w-3.5 h-3.5" />}
-                  </span>
                   <div className="flex-1">
                     <p className="text-sm font-semibold text-slate-900 mb-2">
                       {q.q}
                     </p>
-                    {!correct && (
-                      <p className="text-xs text-red-600 mb-1">
-                        Your answer: <strong>{q.options[answers[i]!]}</strong>
-                      </p>
-                    )}
-                    <p
-                      className={`text-xs font-semibold mb-2 ${
-                        correct ? "text-green-700" : "text-slate-700"
-                      }`}
-                    >
-                      Correct: <strong>{q.options[q.answer]}</strong>
-                    </p>
-                    <p className="text-xs text-slate-500">{q.explanation}</p>
+                    <p className="text-xs text-slate-600">Your answer: <strong>{chosen === null ? "Not answered" : q.options[chosen]}</strong></p>
                   </div>
                 </div>
               </div>
@@ -267,7 +280,7 @@ export default function Quizzes() {
 
         <div className="flex gap-3 justify-center">
           <button
-            onClick={() => startQuiz(selectedQuiz)}
+            onClick={() => selectedQuiz && void startQuiz(selectedQuiz)}
             className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-6 py-2.5 rounded-xl text-sm transition-colors"
           >
             Retry Quiz
@@ -293,7 +306,7 @@ export default function Quizzes() {
         <div className="flex items-center justify-between mb-6">
           <div>
             <p className="text-xs text-slate-400 mb-0.5">
-              {selectedQuiz.title}
+              {selectedQuiz?.title}
             </p>
             <h2
               className="font-bold text-slate-900"
@@ -320,9 +333,7 @@ export default function Quizzes() {
               key={i}
               className={`h-1.5 flex-1 rounded-full transition-all ${
                 answers[i] !== null
-                  ? answers[i] === questions[i].answer
-                    ? "bg-green-500"
-                    : "bg-red-400"
+                  ? "bg-indigo-500"
                   : i === currentQ
                     ? "bg-indigo-600"
                     : marked.includes(i)
@@ -347,16 +358,11 @@ export default function Quizzes() {
         <div className="space-y-3 mb-6">
           {q.options.map((opt, i) => {
             const isSelected = selected === i || answered === i
-            const isCorrect = i === q.answer
             const showResult = answered !== null || selected !== null
 
             let cls =
               "border-slate-200 bg-white text-slate-700 hover:border-indigo-300"
-            if (showResult && isCorrect)
-              cls = "border-green-400 bg-green-50 text-green-800"
-            else if (showResult && isSelected && !isCorrect)
-              cls = "border-red-400 bg-red-50 text-red-800"
-            else if (isSelected)
+            if (isSelected)
               cls = "border-indigo-500 bg-indigo-50 text-indigo-800"
 
             return (
@@ -367,22 +373,12 @@ export default function Quizzes() {
               >
                 <span
                   className={`w-7 h-7 rounded-full border-2 flex items-center justify-center shrink-0 text-xs font-bold ${
-                    showResult && isCorrect
-                      ? "border-green-500 bg-green-500 text-white"
-                      : showResult && isSelected && !isCorrect
-                        ? "border-red-500 bg-red-500 text-white"
-                        : isSelected
+                    isSelected
                           ? "border-indigo-600 bg-indigo-600 text-white"
                           : "border-current"
                   }`}
                 >
-                  {showResult && isCorrect ? (
-                    <Check className="w-4 h-4" />
-                  ) : showResult && isSelected && !isCorrect ? (
-                    <X className="w-4 h-4" />
-                  ) : (
-                    String.fromCharCode(65 + i)
-                  )}
+                  {String.fromCharCode(65 + i)}
                 </span>
                 {opt}
               </button>
@@ -475,6 +471,7 @@ export default function Quizzes() {
         <p className="text-slate-500">
           Test your knowledge and track improvement across topics
         </p>
+        {apiError && <p className="mt-3 text-sm text-red-600">{apiError}</p>}
       </div>
 
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">

@@ -1,6 +1,13 @@
 import { useState } from "react"
 import { Link } from "react-router-dom"
-import { courses, technologies, codingProblems } from "../data/mockData"
+import { useSkiltrixData } from "../context/SkiltrixDataContext"
+import { mapCourse, type CourseCardData } from "../data/apiAdapters"
+import {
+  courses as mockCourses,
+  technologies as mockTechnologies,
+  discussions as mockDiscussions,
+  companies as mockCompanies,
+} from "../data/mockData"
 import { TechIcon } from "../components/TechIcons"
 import PromoVideoModal from "../components/PromoVideoModal"
 import {
@@ -21,10 +28,9 @@ import {
   Award,
   Flame,
   Sparkles,
+  ArrowRight,
 } from "lucide-react"
 import logoImg from "../assets/logo.png"
-
-const activeCourses = courses.filter((c) => c.progress > 0)
 
 function ProgressBar({
   value,
@@ -33,13 +39,14 @@ function ProgressBar({
   value: number
   className?: string
 }) {
+  const safePercent = Math.max(0, Math.min(100, Number(value) || 0))
   return (
     <div
       className={`h-1.5 bg-slate-100 rounded-full overflow-hidden ${className}`}
     >
       <div
         className="h-full bg-indigo-600 rounded-full transition-all duration-500"
-        style={{ width: `${value}%` }}
+        style={{ width: `${safePercent}%` }}
       />
     </div>
   )
@@ -60,18 +67,18 @@ function DifficultyBadge({ level }: { level: string }) {
   )
 }
 
-function CourseCard({ course }: { course: typeof courses[0] }) {
+function CourseCard({ course }: { course: CourseCardData }) {
   return (
     <Link
       to={`/courses/${course.id}`}
       className="group bg-white rounded-xl border border-slate-200 overflow-hidden hover:shadow-lg hover:border-indigo-200 transition-all duration-200"
     >
       <div className="relative h-36 overflow-hidden bg-slate-100">
-        <img
+        {course.image ? <img
           src={course.image}
           alt={course.title}
           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-        />
+        /> : <div className="w-full h-full flex items-center justify-center"><TechIcon name={course.icon || course.technology} className="w-14 h-14 text-indigo-500" /></div>}
         <div
           className={`absolute inset-0 bg-gradient-to-t from-black/60 to-transparent`}
         />
@@ -103,7 +110,7 @@ function CourseCard({ course }: { course: typeof courses[0] }) {
           </span>
           <span className="flex items-center gap-1 text-amber-500 font-medium">
             <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
-            {course.rating}
+            {course.rating || "—"}
           </span>
         </div>
         {course.progress > 0 ? (
@@ -118,7 +125,7 @@ function CourseCard({ course }: { course: typeof courses[0] }) {
           </div>
         ) : (
           <div className="text-xs font-medium text-indigo-600 group-hover:text-indigo-700 flex items-center gap-1">
-            Start course <span>→</span>
+            Start course <ArrowRight className="w-3.5 h-3.5" />
           </div>
         )}
       </div>
@@ -169,22 +176,6 @@ const whyCards = [
   },
 ]
 
-const stats = [
-  { value: "120+", label: "Courses" },
-  { value: "200+", label: "Coding Problems" },
-  { value: "50K+", label: "Learners" },
-  { value: "4.9 / 5.0", label: "Avg Rating" },
-]
-
-const internshipCompanies = [
-  { name: "Amazon", logo: "amazon", path: "/internships/amazon" },
-  { name: "Google", logo: "google", path: "/internships/google" },
-  { name: "Microsoft", logo: "microsoft", path: "/internships/microsoft" },
-  { name: "Meta", logo: "meta", path: "/internships/meta" },
-  { name: "Apple", logo: "apple", path: "/internships/apple" },
-  { name: "Adobe", logo: "adobe", path: "/internships/adobe" },
-]
-
 const communityActivity = [
   {
     user: "Priya S.",
@@ -225,6 +216,84 @@ const communityActivity = [
 
 export default function Home() {
   const [promoOpen, setPromoOpen] = useState(false)
+  const {
+    courses: apiCourses,
+    problems,
+    quizzes,
+    videos,
+    companies: apiCompanies,
+    discussions: apiDiscussions,
+    enrollments,
+    loading,
+  } = useSkiltrixData()
+
+  const safeEnrollments = Array.isArray(enrollments) ? enrollments : []
+  const safeApiCourses = Array.isArray(apiCourses) ? apiCourses : []
+  const safeProblems = Array.isArray(problems) ? problems : []
+  const safeQuizzes = Array.isArray(quizzes) ? quizzes : []
+  const safeVideos = Array.isArray(videos) ? videos : []
+  const safeCompanies = Array.isArray(apiCompanies) ? apiCompanies : []
+  const safeDiscussions = Array.isArray(apiDiscussions) ? apiDiscussions : []
+
+  const progressByCourse = new Map(
+    safeEnrollments
+      .filter((item) => item && (item.course || (item as any).course_id))
+      .map((item) => [item.course?.course_id || (item as any).course_id, item.progress_percent || 0])
+  )
+
+  const mappedCourses = safeApiCourses.map((course) =>
+    mapCourse(course, progressByCourse.get(course.course_id) ?? 0)
+  )
+
+  // Use database courses if available, otherwise fallback to mockCourses so the page is always full of rich content
+  const courses: CourseCardData[] = mappedCourses.length > 0 ? mappedCourses : mockCourses
+
+  // Get distinct technologies from courses, or fallback to mockTechnologies
+  const dynamicTechs = [...new Set(courses.map((c) => c.technology).filter(Boolean))].map((name) => ({
+    name,
+    icon: (name || "").toLowerCase(),
+    color: "bg-indigo-50 text-indigo-700",
+  }))
+  const technologies = dynamicTechs.length >= 4 ? dynamicTechs : mockTechnologies
+
+  const stats = [
+    { value: loading ? "…" : `${safeApiCourses.length || mockCourses.length}`, label: "Courses" },
+    { value: loading ? "…" : `${safeProblems.length || 200}`, label: "Coding Problems" },
+    { value: loading ? "…" : `${safeQuizzes.length || 50}`, label: "Quizzes" },
+    { value: loading ? "…" : `${safeVideos.length || 180}`, label: "Video Lessons" },
+  ]
+
+  const activeCourses: CourseCardData[] = courses.filter((course) => (course.progress || 0) > 0)
+
+  const internshipCompanies = (safeCompanies.length > 0
+    ? safeCompanies.map((c) => ({
+        name: c.name || "Company",
+        logo: c.name || "Company",
+        path: `/internships/${c.company_id || ""}`,
+      }))
+    : mockCompanies.map((c) => ({
+        name: c.name,
+        logo: c.logo || c.name.toLowerCase(),
+        path: `/internships`,
+      }))
+  )
+
+  const communityActivity = (safeDiscussions.length > 0
+    ? safeDiscussions.slice(0, 5).map((post) => ({
+        user: post.author_name || "SkilTrix learner",
+        action: post.title || "Shared a discussion",
+        time: post.created_at ? new Date(post.created_at).toLocaleDateString() : "Recently",
+        icon: <MessageSquare className="w-4 h-4" />,
+        color: "bg-indigo-100 text-indigo-600",
+      }))
+    : mockDiscussions.slice(0, 5).map((d) => ({
+        user: d.user?.name || "SkilTrix learner",
+        action: d.question || "Posted a question",
+        time: d.time || "Recently",
+        icon: <MessageSquare className="w-4 h-4" />,
+        color: "bg-indigo-100 text-indigo-600",
+      }))
+  )
 
   return (
     <div className="bg-slate-50">
@@ -409,9 +478,9 @@ export default function Home() {
             </h2>
             <Link
               to="/dashboard"
-              className="text-sm text-indigo-600 font-medium hover:underline"
+              className="inline-flex items-center gap-1 text-sm text-indigo-600 font-medium hover:underline"
             >
-              View all →
+              View all <ArrowRight className="w-4 h-4" />
             </Link>
           </div>
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -439,8 +508,8 @@ export default function Home() {
                     <span className="text-xs text-slate-400">
                       {course.progress}% complete
                     </span>
-                    <span className="text-xs font-semibold text-indigo-600 group-hover:underline">
-                      Continue →
+                    <span className="inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 group-hover:underline">
+                      Continue <ArrowRight className="w-3.5 h-3.5" />
                     </span>
                   </div>
                 </div>
@@ -466,9 +535,9 @@ export default function Home() {
           </div>
           <Link
             to="/courses"
-            className="text-sm text-indigo-600 font-medium hover:underline"
+            className="inline-flex items-center gap-1 text-sm text-indigo-600 font-medium hover:underline"
           >
-            See all courses →
+            See all courses <ArrowRight className="w-4 h-4" />
           </Link>
         </div>
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
@@ -528,9 +597,9 @@ export default function Home() {
               </h2>
               <Link
                 to="/community"
-                className="text-sm text-indigo-600 font-medium hover:underline"
+                className="inline-flex items-center gap-1 text-sm text-indigo-600 font-medium hover:underline"
               >
-                Join community →
+                Join community <ArrowRight className="w-4 h-4" />
               </Link>
             </div>
             <div className="bg-white rounded-xl border border-slate-200 divide-y divide-slate-100">
@@ -590,9 +659,9 @@ export default function Home() {
               </h2>
               <Link
                 to="/internships"
-                className="text-sm text-indigo-600 font-medium hover:underline"
+                className="inline-flex items-center gap-1 text-sm text-indigo-600 font-medium hover:underline"
               >
-                See all →
+                See all <ArrowRight className="w-4 h-4" />
               </Link>
             </div>
             <div className="grid grid-cols-2 gap-3">
@@ -609,8 +678,8 @@ export default function Home() {
                     <p className="font-semibold text-sm text-slate-900">
                       {c.name}
                     </p>
-                    <p className="text-xs text-indigo-600 font-medium group-hover:underline">
-                      Start prep →
+                    <p className="inline-flex items-center gap-1 text-xs text-indigo-600 font-medium group-hover:underline">
+                      Start prep <ArrowRight className="w-3 h-3" />
                     </p>
                   </div>
                 </Link>
@@ -631,7 +700,7 @@ export default function Home() {
                 to="/internships"
                 className="inline-flex items-center gap-2 bg-white text-indigo-600 font-semibold px-4 py-2 rounded-lg text-sm hover:bg-indigo-50 transition-colors"
               >
-                Explore Internship Prep →
+                Explore Internship Prep <ArrowRight className="w-4 h-4" />
               </Link>
             </div>
           </div>

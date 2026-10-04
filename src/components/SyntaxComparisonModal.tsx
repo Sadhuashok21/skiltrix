@@ -1,5 +1,4 @@
 import { useState } from "react"
-import { SYNTAX_COMPARISONS, SyntaxTopic } from "../data/syntaxComparison"
 import CodeBlock from "./CodeBlock"
 import { TechIcon } from "./TechIcons"
 import { Zap, Play, X } from "lucide-react"
@@ -8,42 +7,31 @@ interface SyntaxComparisonModalProps {
   isOpen: boolean
   onClose: () => void
   onLoadCode: (code: string, language: string) => void
-}
-
-const LANGUAGES = [
-  { id: "python", name: "Python 3", color: "text-yellow-400" },
-  { id: "java", name: "Java", color: "text-orange-400" },
-  { id: "cpp", name: "C++", color: "text-sky-400" },
-  { id: "c", name: "C", color: "text-indigo-400" },
-] as const
-
-type LangKey = "python" | "java" | "cpp" | "c"
-
-const EXT_MAP: Record<LangKey, string> = {
-  python: "py",
-  java: "java",
-  cpp: "cpp",
-  c: "c",
+  topics: Array<{ id: string; title: string; description: string; snippets: Record<string, { code: string; notes: string }> }>
+  languages: Array<{ id: string; label: string; filename: string }>
 }
 
 export default function SyntaxComparisonModal({
   isOpen,
   onClose,
   onLoadCode,
+  topics,
+  languages,
 }: SyntaxComparisonModalProps) {
   const [selectedTopicId, setSelectedTopicId] = useState<string>(
-    SYNTAX_COMPARISONS[0].id,
+    "",
   )
   const [viewMode, setViewMode] = useState<"side-by-side" | "single">(
     "side-by-side",
   )
-  const [activeLang, setActiveLang] = useState<LangKey>("python")
+  const [activeLang, setActiveLang] = useState<string>("")
 
   if (!isOpen) return null
 
-  const currentTopic: SyntaxTopic =
-    SYNTAX_COMPARISONS.find((t) => t.id === selectedTopicId) ||
-    SYNTAX_COMPARISONS[0]
+  const currentTopic = topics.find((t) => t.id === selectedTopicId) || topics[0]
+  const comparisonLanguages = languages.filter((language) => currentTopic?.snippets[language.id])
+  const selectedLang = comparisonLanguages.find((language) => language.id === activeLang) || comparisonLanguages[0]
+  if (!currentTopic || !comparisonLanguages.length) return <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-6"><div className="rounded-xl bg-slate-900 p-6 text-slate-300">No syntax comparisons are available from the API.<button onClick={onClose} className="ml-4 text-indigo-400">Close</button></div></div>
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200">
@@ -58,7 +46,7 @@ export default function SyntaxComparisonModal({
               <h2 className="text-lg font-bold text-white flex items-center gap-2">
                 <span>Syntax Comparison Matrix</span>
                 <span className="text-xs font-normal px-2.5 py-0.5 rounded-full bg-indigo-950 text-indigo-400 border border-indigo-800">
-                  Python vs Java vs C vs C++
+                  {comparisonLanguages.map((language) => language.label).join(" vs ")}
                 </span>
               </h2>
               <p className="text-xs text-slate-400">
@@ -79,7 +67,7 @@ export default function SyntaxComparisonModal({
                     : "text-slate-400 hover:text-white"
                 }`}
               >
-                Grid View (All 4)
+                Grid View (All languages)
               </button>
               <button
                 onClick={() => setViewMode("single")}
@@ -105,7 +93,7 @@ export default function SyntaxComparisonModal({
 
         {/* Topic navigation tabs */}
         <div className="flex items-center gap-2 px-6 py-2.5 bg-slate-900/90 border-b border-slate-800 overflow-x-auto">
-          {SYNTAX_COMPARISONS.map((topic) => (
+          {topics.map((topic) => (
             <button
               key={topic.id}
               onClick={() => setSelectedTopicId(topic.id)}
@@ -133,7 +121,7 @@ export default function SyntaxComparisonModal({
           {/* Side-by-side 2x2 Grid View */}
           {viewMode === "side-by-side" ? (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {LANGUAGES.map((lang) => {
+              {comparisonLanguages.map((lang) => {
                 const snippetData = currentTopic.snippets[lang.id]
                 return (
                   <div
@@ -143,7 +131,7 @@ export default function SyntaxComparisonModal({
                     <div className="flex items-center justify-between px-3.5 py-2 bg-slate-900 border-b border-slate-800">
                       <div className="flex items-center gap-2 font-medium text-xs text-white">
                         <TechIcon name={lang.id} className="w-4 h-4" />
-                        <span>{lang.name}</span>
+                        <span>{lang.label}</span>
                       </div>
                       <button
                         onClick={() => {
@@ -161,7 +149,7 @@ export default function SyntaxComparisonModal({
                       <CodeBlock
                         code={snippetData.code}
                         language={lang.id}
-                        filename={`syntax_${lang.id}.${EXT_MAP[lang.id] || lang.id}`}
+                        filename={`syntax_${lang.id}.${lang.filename.split(".").pop() || "txt"}`}
                         showLineNumbers={true}
                         maxHeight="240px"
                       />
@@ -179,7 +167,7 @@ export default function SyntaxComparisonModal({
             /* Single Tabbed View */
             <div className="space-y-4">
               <div className="flex items-center gap-2 border-b border-slate-800 pb-2">
-                {LANGUAGES.map((lang) => (
+                {comparisonLanguages.map((lang) => (
                   <button
                     key={lang.id}
                     onClick={() => setActiveLang(lang.id)}
@@ -190,21 +178,21 @@ export default function SyntaxComparisonModal({
                     }`}
                   >
                     <TechIcon name={lang.id} className="w-4 h-4" />
-                    <span>{lang.name}</span>
+                    <span>{lang.label}</span>
                   </button>
                 ))}
               </div>
 
-              <div className="space-y-3">
+              {selectedLang && <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="text-xs text-slate-400">
-                    Syntax notes: {currentTopic.snippets[activeLang].notes}
+                    Syntax notes: {currentTopic.snippets[selectedLang.id].notes}
                   </span>
                   <button
                     onClick={() => {
                       onLoadCode(
-                        currentTopic.snippets[activeLang].code,
-                        activeLang,
+                        currentTopic.snippets[selectedLang.id].code,
+                        selectedLang.id,
                       )
                       onClose()
                     }}
@@ -216,13 +204,13 @@ export default function SyntaxComparisonModal({
                 </div>
 
                 <CodeBlock
-                  code={currentTopic.snippets[activeLang].code}
-                  language={activeLang}
-                  filename={`syntax_${activeLang}.${EXT_MAP[activeLang] || activeLang}`}
+                  code={currentTopic.snippets[selectedLang.id].code}
+                  language={selectedLang.id}
+                  filename={`syntax_${selectedLang.id}.${selectedLang.filename.split(".").pop() || "txt"}`}
                   showLineNumbers={true}
                   maxHeight="360px"
                 />
-              </div>
+              </div>}
             </div>
           )}
         </div>

@@ -1,6 +1,7 @@
 import { useState } from "react"
 import { Link } from "react-router-dom"
-import { courses, technologies } from "../data/mockData"
+import { useSkiltrixData } from "../context/SkiltrixDataContext"
+import { mapCourse } from "../data/apiAdapters"
 import { TechIcon } from "../components/TechIcons"
 
 const difficulties = ["All", "Beginner", "Intermediate", "Advanced"]
@@ -33,6 +34,10 @@ function ProgressBar({ value }: { value: number }) {
 }
 
 export default function Courses() {
+  const { courses: apiCourses, enrollments, loading } = useSkiltrixData()
+  const progressByCourse = new Map(enrollments.map((item) => [item.course.course_id, item.progress_percent]))
+  const courses = apiCourses.map((course) => mapCourse(course, progressByCourse.get(course.course_id) ?? 0))
+  const technologies = [...new Set(courses.map((course) => course.technology))].map((name) => ({ name, icon: name.toLowerCase(), color: "bg-indigo-50 text-indigo-700" }))
   const [search, setSearch] = useState("")
   const [difficulty, setDifficulty] = useState("All")
   const [tech, setTech] = useState("All")
@@ -160,7 +165,7 @@ export default function Courses() {
       </p>
 
       {/* Course grid */}
-      {filtered.length === 0 ? (
+      {loading ? <div className="text-center py-20 text-slate-500">Loading course catalog…</div> : filtered.length === 0 ? (
         <div className="text-center py-20">
           <div className="text-5xl mb-4">
             <svg
@@ -203,11 +208,11 @@ export default function Courses() {
               className="group bg-white rounded-xl border border-slate-200 overflow-hidden hover:shadow-lg hover:border-indigo-200 transition-all duration-200"
             >
               <div className="relative h-40 overflow-hidden bg-slate-100">
-                <img
+                {course.image ? <img
                   src={course.image}
                   alt={course.title}
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                />
+                /> : <div className="w-full h-full flex items-center justify-center"><TechIcon name={course.icon || course.technology} className="w-16 h-16 text-indigo-500" /></div>}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent" />
                 <div className="absolute top-3 left-3 flex items-center gap-1.5">
                   <DifficultyBadge level={course.difficulty} />
@@ -226,7 +231,7 @@ export default function Courses() {
                   >
                     <path d="M3.612 15.443c-.386.198-.824-.149-.746-.592l.83-4.73L.173 6.765c-.329-.314-.158-.888.283-.95l4.898-.696L7.538.792c.197-.39.73-.39.927 0l2.184 4.327 4.898.696c.441.062.612.636.282.95l-3.522 3.356.83 4.73c.078.443-.36.79-.746.592L8 13.187l-4.389 2.256z" />
                   </svg>
-                  {course.rating}
+                  {course.rating || "—"}
                 </div>
               </div>
               <div className="p-5">
@@ -281,7 +286,7 @@ export default function Courses() {
                     >
                       <path d="M7 14s-1 0-1-1 1-4 5-4 5 3 5 4-1 1-1 1zm4-6a3 3 0 1 0 0-6 3 3 0 0 0 0 6m-5.784 6A2.24 2.24 0 0 1 5 13c0-1.355.68-2.75 1.936-3.72A6.3 6.3 0 0 0 5 9c-4 0-5 3-5 4s1 1 1 1zM4.5 8a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5" />
                     </svg>
-                    {(course.students / 1000).toFixed(0)}K
+                    {course.students ? `${(course.students / 1000).toFixed(0)}K` : "—"}
                   </span>
                 </div>
                 {course.progress > 0 ? (

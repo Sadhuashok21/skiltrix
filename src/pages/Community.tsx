@@ -1,6 +1,8 @@
 import { useState } from "react"
 import { Link } from "react-router-dom"
-import { discussions } from "../data/mockData"
+import { useSkiltrixData } from "../context/SkiltrixDataContext"
+import { mapDiscussion, type DiscussionCardData } from "../data/apiAdapters"
+import { createDiscussion } from "../api/community"
 import CodeBlock from "../components/CodeBlock"
 import {
   ThumbsUp,
@@ -71,7 +73,7 @@ const topContributors = [
   },
 ]
 
-function DiscussionCard({ d }: { d: typeof discussions[0] }) {
+function DiscussionCard({ d }: { d: DiscussionCardData }) {
   const [liked, setLiked] = useState(false)
 
   const [bookmarked, setBookmarked] = useState(d.bookmarked)
@@ -155,11 +157,39 @@ function DiscussionCard({ d }: { d: typeof discussions[0] }) {
 }
 
 export default function Community() {
+  const { discussions: apiDiscussions, refresh } = useSkiltrixData()
+  const discussions = apiDiscussions.map(mapDiscussion)
+  const contributorCounts = new Map<string, number>()
+  apiDiscussions.forEach((post) => contributorCounts.set(post.author_name || "SkilTrix learner", (contributorCounts.get(post.author_name || "SkilTrix learner") ?? 0) + 1))
+  const contributorColors = ["from-indigo-500 to-violet-500", "from-blue-500 to-cyan-500", "from-emerald-500 to-teal-500", "from-amber-500 to-orange-500"]
+  const topContributors = [...contributorCounts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5).map(([name, count], index) => ({ name, points: count, rank: index + 1, avatar: name.split(/\s+/).map((part) => part[0]).join("").slice(0, 2).toUpperCase(), color: contributorColors[index % contributorColors.length] }))
   const [activeTag, setActiveTag] = useState("All")
 
   const [showNew, setShowNew] = useState(false)
 
   const [newPost, setNewPost] = useState("")
+  const [newTag, setNewTag] = useState("Python")
+  const [postError, setPostError] = useState("")
+  const [posting, setPosting] = useState(false)
+
+  const submitPost = async () => {
+    const userId = localStorage.getItem("user_id")
+    if (!userId) { setPostError("Sign in before posting to the community."); return }
+    const content = newPost.trim()
+    if (!content) { setPostError("Write your post before submitting."); return }
+    setPosting(true)
+    setPostError("")
+    try {
+      await createDiscussion({ user_id: userId, title: content.slice(0, 120), content, tag: newTag })
+      setNewPost("")
+      setShowNew(false)
+      refresh()
+    } catch {
+      setPostError("Your post could not be saved. Please try again.")
+    } finally {
+      setPosting(false)
+    }
+  }
 
   return (
     <div className="max-w-[1440px] mx-auto px-4 lg:px-8 py-8">
@@ -242,7 +272,7 @@ export default function Community() {
                 <label className="block text-xs font-semibold text-slate-500 mb-1.5 uppercase tracking-wide">
                   Tag
                 </label>
-                <select className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                <select value={newTag} onChange={(event) => setNewTag(event.target.value)} className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
                   {tagOptions.slice(1).map((t) => (
                     <option key={t}>{t}</option>
                   ))}
@@ -260,12 +290,14 @@ export default function Community() {
                   className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 />
               </div>
+              {postError && <p className="text-sm text-red-600">{postError}</p>}
               <div className="flex gap-3">
                 <button
-                  onClick={() => setShowNew(false)}
+                  onClick={() => void submitPost()}
+                  disabled={posting}
                   className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 rounded-lg text-sm transition-colors"
                 >
-                  Post
+                  {posting ? "Posting…" : "Post"}
                 </button>
                 <button
                   onClick={() => setShowNew(false)}
@@ -333,12 +365,12 @@ export default function Community() {
 
           {/* Discussions */}
           <div className="space-y-4">
-            {discussions.map((d) => (
+            {discussions.filter((d) => activeTag === "All" || d.tag.toLowerCase() === activeTag.toLowerCase()).map((d) => (
               <DiscussionCard key={d.id} d={d} />
             ))}
 
             {/* Empty state placeholder */}
-            <div className="bg-slate-50 rounded-xl border border-dashed border-slate-300 p-8 text-center">
+            {discussions.length === 0 && <div className="bg-slate-50 rounded-xl border border-dashed border-slate-300 p-8 text-center">
               <div className="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center mx-auto mb-3 text-slate-400">
                 <MessageSquare className="w-6 h-6" />
               </div>
@@ -355,7 +387,7 @@ export default function Community() {
                 <span>Start a discussion</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
-            </div>
+            </div>}
           </div>
         </div>
 

@@ -23,7 +23,7 @@ import {
 } from "lucide-react"
 
 export interface Video {
-  id: number
+  id: string | number
   title: string
   instructor: string
   duration: string
