@@ -1,6 +1,6 @@
 import { useState } from "react"
-import { Link } from "react-router-dom"
-import { companies } from "../data/mockData"
+import { Link, useParams } from "react-router-dom"
+import { useSkiltrixData } from "../context/SkiltrixDataContext"
 import { TechIcon } from "../components/TechIcons"
 import {
   Check,
@@ -10,56 +10,24 @@ import {
   Target,
 } from "lucide-react"
 
-const roadmapAmazon = [
-  {
-    step: 1,
-    title: "Python or Java Fundamentals",
-    desc: "Strong programming foundation is essential",
-    done: true,
-  },
-  {
-    step: 2,
-    title: "Data Structures",
-    desc: "Arrays, Linked Lists, Trees, Graphs, Heaps",
-    done: true,
-  },
-  {
-    step: 3,
-    title: "Algorithms",
-    desc: "Sorting, Searching, Dynamic Programming, BFS/DFS",
-    done: false,
-  },
-  {
-    step: 4,
-    title: "Coding Patterns",
-    desc: "Sliding Window, Two Pointers, Backtracking",
-    done: false,
-  },
-  {
-    step: 5,
-    title: "Online Assessment Practice",
-    desc: "Amazon-style OA problems and time management",
-    done: false,
-  },
-  {
-    step: 6,
-    title: "System Design Basics",
-    desc: "Scalability, databases, APIs",
-    done: false,
-  },
-  {
-    step: 7,
-    title: "Behavioral Preparation",
-    desc: "Amazon Leadership Principles",
-    done: false,
-  },
-]
-
 export default function Internships() {
-  const [selectedCompany, setSelectedCompany] = useState<string | null>(null)
+  const { companies: apiCompanies, internships: openings, problems: apiProblems } = useSkiltrixData()
+  const { company: routeCompany } = useParams()
+  const [selectedCompany, setSelectedCompany] = useState<string | null>(routeCompany ?? null)
+  const companies = apiCompanies.map((company) => ({
+    id: company.company_id,
+    name: company.name,
+    logo: company.name,
+    color: "border-slate-200",
+    progress: 0,
+    category: "Company Guide",
+    description: company.description,
+    roadmaps: company.roadmaps ?? [],
+  }))
 
   if (selectedCompany) {
-    const company = companies.find((c) => c.id === selectedCompany)!
+    const company = companies.find((c) => c.id === selectedCompany)
+    if (!company) return <div className="max-w-[1440px] mx-auto px-4 py-16 text-center text-slate-500">Company preparation guide not found.</div>
     const progress = company.progress
 
     return (
@@ -125,23 +93,15 @@ export default function Internships() {
                 Preparation Roadmap
               </h2>
               <div className="space-y-4">
-                {roadmapAmazon.map((r) => (
+                {company.roadmaps.map((r) => (
                   <div
-                    key={r.step}
-                    className={`flex gap-4 p-4 rounded-xl border ${
-                      r.done
-                        ? "border-green-200 bg-green-50"
-                        : "border-slate-200"
-                    }`}
+                    key={r.roadmap_id}
+                    className="flex gap-4 p-4 rounded-xl border border-slate-200"
                   >
                     <div
-                      className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 font-bold text-sm ${
-                        r.done
-                          ? "bg-green-500 text-white"
-                          : "bg-slate-200 text-slate-500"
-                      }`}
+                      className="w-8 h-8 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center shrink-0 font-bold text-sm"
                     >
-                      {r.done ? <Check className="w-4 h-4 text-white" /> : r.step}
+                      {r.step_number}
                     </div>
                     <div>
                       <h3
@@ -152,9 +112,9 @@ export default function Internships() {
                       >
                         {r.title}
                       </h3>
-                      <p className="text-xs text-slate-500 mt-0.5">{r.desc}</p>
+                      <p className="text-xs text-slate-500 mt-0.5">{r.description}</p>
                     </div>
-                    {!r.done && (
+                    {(
                       <Link
                         to="/courses"
                         className="ml-auto text-xs font-semibold text-indigo-600 hover:underline shrink-0 mt-0.5"
@@ -173,56 +133,30 @@ export default function Internships() {
                 className="font-bold text-slate-900 mb-4"
                 style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}
               >
-                {company.name}-Style Practice Problems
+                Recommended Practice Problems
               </h2>
               <div className="space-y-3">
-                {[
-                  {
-                    title: "Two Sum",
-                    diff: "Easy",
-                    topics: "Arrays, Hash Map",
-                  },
-                  {
-                    title: "Maximum Subarray",
-                    diff: "Medium",
-                    topics: "Dynamic Programming",
-                  },
-                  {
-                    title: "Number of Islands",
-                    diff: "Medium",
-                    topics: "BFS/DFS, Grid",
-                  },
-                  {
-                    title: "LRU Cache",
-                    diff: "Medium",
-                    topics: "Design, Hash Map",
-                  },
-                  {
-                    title: "Trapping Rain Water",
-                    diff: "Hard",
-                    topics: "Stack, Two Pointers",
-                  },
-                ].map((p) => (
+                {apiProblems.slice(0, 5).map((p) => (
                   <Link
                     to="/practice"
-                    key={p.title}
+                    key={p.problem_id}
                     className="flex items-center gap-4 p-3.5 rounded-lg border border-slate-100 hover:border-indigo-200 hover:bg-indigo-50/20 transition-all"
                   >
                     <span
                       className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
-                        p.diff === "Easy"
+                        p.difficulty === "Easy"
                           ? "bg-green-100 text-green-700"
-                          : p.diff === "Medium"
+                          : p.difficulty === "Medium"
                             ? "bg-amber-100 text-amber-700"
                             : "bg-red-100 text-red-700"
                       }`}
                     >
-                      {p.diff}
+                      {p.difficulty}
                     </span>
                     <span className="flex-1 text-sm font-semibold text-slate-900">
                       {p.title}
                     </span>
-                    <span className="text-xs text-slate-400">{p.topics}</span>
+                    <span className="text-xs text-slate-400">{Array.isArray(p.topics) ? p.topics.join(", ") : p.topics}</span>
                     <span className="text-xs text-indigo-600 font-medium">
                       Solve →
                     </span>
@@ -442,6 +376,23 @@ export default function Internships() {
           </button>
         ))}
       </div>
+      {openings.length > 0 && (
+        <section className="mt-12">
+          <h2 className="text-xl font-bold text-slate-900 mb-5">Open internship listings</h2>
+          <div className="grid md:grid-cols-2 gap-4">
+            {openings.map((opening) => (
+              <article key={opening.internship_id} className="bg-white border border-slate-200 rounded-xl p-5 flex items-center justify-between gap-4">
+                <div>
+                  <h3 className="font-semibold text-slate-900">{opening.name}</h3>
+                  <p className="text-sm text-slate-500">{opening.company_name || opening.company?.name || "Company not specified"} · {opening.location || opening.type} · {opening.is_paid ? `Paid · ${opening.price}` : "Unpaid"}</p>
+                  <p className="text-xs text-slate-400 mt-1">Deadline: {opening.deadline || "Not specified"}</p>
+                </div>
+                {opening.apply_link && <a href={opening.apply_link} target="_blank" rel="noreferrer" className="shrink-0 text-sm font-semibold text-indigo-600">Apply</a>}
+              </article>
+            ))}
+          </div>
+        </section>
+      )}
     </div>
   )
 }

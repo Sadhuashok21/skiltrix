@@ -28,6 +28,47 @@ const SCENES = [
   { id: 5, title: "Launch Your Career", start: 20, end: 25 },
 ]
 
+function drawVectorCheckmark(ctx: CanvasRenderingContext2D, x: number, y: number, size = 12) {
+  ctx.save()
+  ctx.beginPath()
+  ctx.moveTo(x, y + size * 0.45)
+  ctx.lineTo(x + size * 0.35, y + size * 0.8)
+  ctx.lineTo(x + size * 0.9, y + size * 0.15)
+  ctx.strokeStyle = "#34d399"
+  ctx.lineWidth = 2.2
+  ctx.lineCap = "round"
+  ctx.lineJoin = "round"
+  ctx.stroke()
+  ctx.restore()
+}
+
+function drawVectorStar(ctx: CanvasRenderingContext2D, cx: number, cy: number, spikes = 5, outerRadius = 7, innerRadius = 3.5) {
+  ctx.save()
+  let rot = (Math.PI / 2) * 3
+  let x = cx
+  let y = cy
+  const step = Math.PI / spikes
+
+  ctx.beginPath()
+  ctx.moveTo(cx, cy - outerRadius)
+  for (let i = 0; i < spikes; i++) {
+    x = cx + Math.cos(rot) * outerRadius
+    y = cy + Math.sin(rot) * outerRadius
+    ctx.lineTo(x, y)
+    rot += step
+
+    x = cx + Math.cos(rot) * innerRadius
+    y = cy + Math.sin(rot) * innerRadius
+    ctx.lineTo(x, y)
+    rot += step
+  }
+  ctx.lineTo(cx, cy - outerRadius)
+  ctx.closePath()
+  ctx.fillStyle = "#facc15"
+  ctx.fill()
+  ctx.restore()
+}
+
 export default function PromoVideoModal({ isOpen, onClose }: PromoVideoModalProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -101,6 +142,23 @@ export default function PromoVideoModal({ isOpen, onClose }: PromoVideoModalProp
     if (!canvas) return
     const ctx = canvas.getContext("2d")
     if (!ctx) return
+
+    if (!ctx.roundRect) {
+      (ctx as any).roundRect = function (x: number, y: number, rw: number, rh: number, r: number | number[] = 0) {
+        const radius = typeof r === "number" ? r : Array.isArray(r) ? r[0] : 0
+        this.beginPath()
+        this.moveTo(x + radius, y)
+        this.lineTo(x + rw - radius, y)
+        this.quadraticCurveTo(x + rw, y, x + rw, y + radius)
+        this.lineTo(x + rw, y + rh - radius)
+        this.quadraticCurveTo(x + rw, y + rh, x + rw - radius, y + rh)
+        this.lineTo(x + radius, y + rh)
+        this.quadraticCurveTo(x, y + rh, x, y + rh - radius)
+        this.lineTo(x, y + radius)
+        this.quadraticCurveTo(x, y, x + radius, y)
+        this.closePath()
+      }
+    }
 
     const w = canvas.width
     const h = canvas.height
@@ -293,10 +351,11 @@ export default function PromoVideoModal({ isOpen, onClose }: PromoVideoModalProp
         ctx.roundRect(w / 2 - 200, editorY + editorH - 65, 400, 42, 8)
         ctx.fill()
         ctx.stroke()
+        drawVectorCheckmark(ctx, w / 2 - 165, editorY + editorH - 49, 14)
         ctx.font = "bold 14px monospace"
         ctx.fillStyle = "#34d399"
         ctx.textAlign = "center"
-        ctx.fillText("✓ Execution Complete: 0.04s • Zero Errors", w / 2, editorY + editorH - 39)
+        ctx.fillText("Execution Complete: 0.04s • Zero Errors", w / 2 + 10, editorY + editorH - 39)
       }
     } else if (t < 15) {
       // ================= SCENE 3 (10s - 15s): 120+ Courses & Coding Lab =================
@@ -362,8 +421,11 @@ export default function PromoVideoModal({ isOpen, onClose }: PromoVideoModalProp
         ctx.fillText(card.lessons, cx + 20, cy + 175)
 
         // Rating
+        drawVectorStar(ctx, cx + 27, cy + 201, 5, 6.5, 3.2)
+        ctx.font = "13px system-ui, sans-serif"
         ctx.fillStyle = "#facc15"
-        ctx.fillText("★ 4.9 (42k learners)", cx + 20, cy + 205)
+        ctx.textAlign = "left"
+        ctx.fillText("4.9 (42k learners)", cx + 38, cy + 205)
       })
 
       // Bottom banner

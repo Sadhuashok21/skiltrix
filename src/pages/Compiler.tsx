@@ -1,7 +1,9 @@
-import { useState, useCallback } from "react"
+import { useState, useCallback, useEffect } from "react"
 import CodeEditor from "../components/CodeEditor"
 import SyntaxComparisonModal from "../components/SyntaxComparisonModal"
 import { TechIcon } from "../components/TechIcons"
+import api from "../api/client"
+import { parseCompilerDiagnostics, type SourceDiagnostic } from "../api/diagnostics"
 import {
   Play,
   RotateCcw,
@@ -19,273 +21,81 @@ export interface LanguageDef {
   id: string
   label: string
   filename: string
-  paradigm: string
-  syntaxSummary: string
 }
-
-const LANGUAGES: LanguageDef[] = [
-  {
-    id: "python",
-    label: "Python 3",
-    filename: "main.py",
-    paradigm: "Dynamic • High-level",
-    syntaxSummary:
-      "Indentation scoped • def keyword • # comments • print() • Dynamic typing",
-  },
-  {
-    id: "java",
-    label: "Java 17",
-    filename: "Main.java",
-    paradigm: "Strictly Typed • OOP",
-    syntaxSummary:
-      "public class Main • public static void main • System.out.println() • { } blocks",
-  },
-  {
-    id: "cpp",
-    label: "C++ 20",
-    filename: "main.cpp",
-    paradigm: "Compiled • Multi-paradigm",
-    syntaxSummary:
-      "#include <iostream> • using namespace std; • cout << • STL & references",
-  },
-  {
-    id: "c",
-    label: "C (GCC)",
-    filename: "main.c",
-    paradigm: "Procedural • Low-level",
-    syntaxSummary:
-      '#include <stdio.h> • int main() • printf("%d") • pointers * & manual memory',
-  },
-  {
-    id: "javascript",
-    label: "JavaScript",
-    filename: "main.js",
-    paradigm: "Event-driven • Dynamic",
-    syntaxSummary:
-      "function / const / let • console.log() • async/await • template strings",
-  },
-  {
-    id: "sql",
-    label: "SQL",
-    filename: "query.sql",
-    paradigm: "Declarative • Relational",
-    syntaxSummary:
-      "CREATE TABLE • INSERT INTO • SELECT ... WHERE • -- comments",
-  },
-  {
-    id: "html",
-    label: "HTML / CSS",
-    filename: "index.html",
-    paradigm: "Markup & Styles",
-    syntaxSummary:
-      "<!DOCTYPE html> • <html> • <style> CSS rules • Live interactive preview",
-  },
-]
-
-const STARTER_CODE: Record<string, string> = {
-  python: `# Welcome to SkillTrix Python 3 Compiler
-# Write your code below and click Run
-
-def greet(name: str) -> str:
-    return f"Hello, {name}!"
-
-# Call the function
-message = greet("Developer")
-print(message)
-
-# Loop example
-for i in range(1, 4):
-    print(f"Line {i}: Learning Python with SkillTrix")`,
-
-  java: `// Welcome to SkillTrix Java Compiler
-// Strictly-typed object-oriented language
-
-public class Main {
-    public static void main(String[] args) {
-        System.out.println("Hello, Developer!");
-
-        // Loop example
-        for (int i = 1; i <= 3; i++) {
-            System.out.println("Line " + i + ": Learning Java with SkillTrix");
-        }
-    }
-
-    static String greet(String name) {
-        return "Hello, " + name + "!";
-    }
-} `,
-
-  cpp: `// Welcome to SkillTrix C++ Compiler
-// High performance with templates and STL
-
-#include <iostream>
-#include <string>
-using namespace std;
-
-string greet(string name) {
-    return "Hello, " + name + "!";
+interface ApiLanguage { language_id: string; name: string }
+interface ApiSnippet {
+  snippet_id: string
+  language: string
+  title: string
+  code: string
+  stdin?: string
+  stdout?: string
 }
-
-int main() {
-    cout << greet("Developer") << endl;
-
-    for (int i = 1; i <= 3; i++) {
-        cout << "Line " << i << ": Learning C++ with SkillTrix" << endl;
-    }
-
-    return 0;
-}`,
-
-  c: `// Welcome to SkillTrix C Compiler
-// Procedural language with direct memory control
-
-#include <stdio.h>
-
-int main(void) {
-    printf("Hello, Developer!\\n");
-
-    for (int i = 1; i <= 3; i++) {
-        printf("Line %d: Learning C with SkillTrix\\n", i);
-    }
-
-    return 0;
-}`,
-
-  javascript: `// Welcome to SkillTrix JavaScript Compiler
-
-function greet(name) {
-  return \`Hello, \${name}!\`;
+interface ApiSyntax {
+  entry_id: string
+  topic: string
+  category: string
+  notes?: string
+  python_code?: string
+  java_code?: string
+  cpp_code?: string
+  c_code?: string
+  javascript_code?: string
 }
-
-const message = greet("Developer");
-console.log(message);
-
-// Loop example
-for (let i = 1; i <= 3; i++) {
-  console.log(\`Line \${i}: Learning JS with SkillTrix\`);
-}`,
-
-  sql: `-- Welcome to SkillTrix SQL Compiler
-
-CREATE TABLE students (
-    id INT PRIMARY KEY,
-    name VARCHAR(50),
-    score INT,
-    course VARCHAR(50)
-);
-
-INSERT INTO students VALUES
-    (1, 'Jordan', 92, 'Python'),
-    (2, 'Priya', 88, 'JavaScript'),
-    (3, 'Marcus', 95, 'DSA'),
-    (4, 'Aisha', 79, 'Java');
-
--- Query: Find top students
-SELECT name, course, score
-FROM students
-WHERE score > 85
-ORDER BY score DESC;`,
-
-  html: `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SkillTrix Live Web Preview</title>
-  <style>
-    body {
-      font-family: system-ui, -apple-system, sans-serif;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      min-height: 100vh;
-      margin: 0;
-      background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
-      color: white;
-    }
-    .card {
-      background: rgba(255, 255, 255, 0.95);
-      color: #0f172a;
-      border-radius: 16px;
-      padding: 2.5rem 3rem;
-      text-align: center;
-      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.35);
-      max-width: 380px;
-    }
-    h1 { color: #4338ca; margin: 0 0 0.5rem 0; font-size: 1.6rem; }
-    p { color: #475569; margin: 0; font-size: 0.95rem; }
-    .badge {
-      display: inline-block;
-      margin-top: 1.25rem;
-      padding: 0.35rem 1rem;
-      border-radius: 9999px;
-      background: #eef2ff;
-      color: #4f46e5;
-      font-weight: 600;
-      font-size: 0.8rem;
-    }
-  </style>
-</head>
-<body>
-  <div class="card">
-    <h1>Hello, World!</h1>
-    <p>Welcome to SkillTrix Live HTML/CSS Compiler</p>
-    <div class="badge">Live Preview Active</div>
-  </div>
-</body>
-</html>`,
+interface SyntaxTopic {
+  id: string
+  title: string
+  description: string
+  snippets: Record<string, { code: string; notes: string }>
 }
-
-const MOCK_OUTPUTS: Record<string, string> = {
-  python: `Hello, Developer!
-Line 1: Learning Python with SkillTrix
-Line 2: Learning Python with SkillTrix
-Line 3: Learning Python with SkillTrix
-
-Execution completed in 0.12s`,
-
-  javascript: `Hello, Developer!
-Line 1: Learning JS with SkillTrix
-Line 2: Learning JS with SkillTrix
-Line 3: Learning JS with SkillTrix
-
-Execution completed in 0.08s`,
-
-  java: `Hello, Developer!
-Line 1: Learning Java with SkillTrix
-Line 2: Learning Java with SkillTrix
-Line 3: Learning Java with SkillTrix
-
-Execution completed in 0.34s`,
-
-  cpp: `Hello, Developer!
-Line 1: Learning C++ with SkillTrix
-Line 2: Learning C++ with SkillTrix
-Line 3: Learning C++ with SkillTrix
-
-Execution completed in 0.05s`,
-
-  c: `Hello, Developer!
-Line 1: Learning C with SkillTrix
-Line 2: Learning C with SkillTrix
-Line 3: Learning C with SkillTrix
-
-Execution completed in 0.04s`,
-
-  sql: `name    | course     | score
---------|------------|-------
-Marcus  | DSA        | 95
-Jordan  | Python     | 92
-Priya   | JavaScript | 88
-
-3 rows returned · 0.02s`,
-
-  html: `[Live Web Preview is rendering in the preview tab]`,
+const EXTENSIONS: Record<string, string> = {
+  python: "py", java: "java", cpp: "cpp", c: "c", javascript: "js",
+  typescript: "ts", sql: "sql", html: "html", css: "css", go: "go",
+  rust: "rs", php: "php", ruby: "rb", csharp: "cs",
+}
+const DEFAULT_CODE: Record<string, string> = {
+  python: 'print("Hello from SkillTrix!")\n',
+  java: 'public class Main {\n    public static void main(String[] args) {\n        System.out.println("Hello from SkillTrix!");\n    }\n}\n',
+  cpp: '#include <iostream>\nint main() {\n    std::cout << "Hello from SkillTrix!" << std::endl;\n    return 0;\n}\n',
+  c: '#include <stdio.h>\nint main(void) {\n    printf("Hello from SkillTrix!\\n");\n    return 0;\n}\n',
+  javascript: 'console.log("Hello from SkillTrix!");\n',
+  sql: "SELECT 'Hello from SkillTrix!' AS message;\n",
+  html: '<!doctype html>\n<html><head><meta charset="utf-8"><title>SkillTrix preview</title></head><body><h1>Hello from SkillTrix!</h1></body></html>\n',
+}
+const getStarterCode = (language: string, snippets: ApiSnippet[], topics: SyntaxTopic[]) =>
+  snippets.find((snippet) => normalize(snippet.language) === language)?.code ||
+  DEFAULT_CODE[language] ||
+  topics.find((topic) => topic.snippets[language])?.snippets[language].code || ""
+const asList = <T,>(data: unknown): T[] =>
+  Array.isArray(data) ? data as T[] : ((data as { results?: T[] })?.results ?? [])
+const normalize = (value: string) => {
+  const compact = value.toLowerCase().replace(/[^a-z0-9+#]/g, "")
+  const aliases: Record<string, string> = {
+    "c++": "cpp", cxx: "cpp", "c#": "csharp", js: "javascript",
+    node: "javascript", nodejs: "javascript", py: "python", python3: "python",
+    python37: "python", python38: "python", python39: "python", python310: "python",
+    python311: "python", python312: "python", python313: "python", java17: "java",
+    cpp20: "cpp", "c++20": "cpp", htmlcss: "html", html5: "html", sqlite: "sql", sqlite3: "sql",
+    postgresql: "sql", mysql: "sql",
+  }
+  return aliases[compact] || compact
+}
+const toLanguage = (item: ApiLanguage): LanguageDef => {
+  // language_id is a database key (often a generated identifier), not the runner's language name.
+  const id = normalize(item.name || item.language_id)
+  const ext = EXTENSIONS[id] || id
+  const filename = id === "java" ? "Main.java" : id === "html" ? "index.html" : id === "sql" ? "query.sql" : `main.${ext}`
+  return { id, label: item.name, filename }
 }
 
 export default function Compiler() {
-  const [lang, setLang] = useState("python")
-  const [code, setCode] = useState(STARTER_CODE.python)
+  const [languages, setLanguages] = useState<LanguageDef[]>([])
+  const [snippets, setSnippets] = useState<ApiSnippet[]>([])
+  const [syntaxTopics, setSyntaxTopics] = useState<SyntaxTopic[]>([])
+  const [loadError, setLoadError] = useState("")
+  const [lang, setLang] = useState("")
+  const [code, setCode] = useState("")
+  const [codeByLanguage, setCodeByLanguage] = useState<Record<string, string>>({})
   const [output, setOutput] = useState("")
   const [status, setStatus] =
     useState<"idle" | "running" | "success" | "error">("idle")
@@ -299,15 +109,57 @@ export default function Compiler() {
   const [activeOutputTab, setActiveOutputTab] = useState<"console" | "preview">(
     "console",
   )
+  const [compilerDiagnostics, setCompilerDiagnostics] = useState<SourceDiagnostic[]>([])
+  const [diagnosticTarget, setDiagnosticTarget] = useState<{ line: number; column: number } | null>(null)
 
-  const currentLang = LANGUAGES.find((l) => l.id === lang) || LANGUAGES[0]
+  const currentLang = languages.find((l) => l.id === lang) || languages[0]
+
+  useEffect(() => {
+    let alive = true
+    Promise.all([api.get("/languages/"), api.get("/snippets/"), api.get("/syntax/")])
+      .then(([languageResponse, snippetResponse, syntaxResponse]) => {
+        if (!alive) return
+        const loadedLanguages = asList<ApiLanguage>(languageResponse.data).map(toLanguage)
+        const loadedSnippets = asList<ApiSnippet>(snippetResponse.data)
+        const loadedSyntax = asList<ApiSyntax>(syntaxResponse.data).map((entry) => {
+          const fields: Record<string, string | undefined> = {
+            python: entry.python_code, java: entry.java_code, cpp: entry.cpp_code,
+            c: entry.c_code, javascript: entry.javascript_code,
+          }
+          const snippets = Object.fromEntries(Object.entries(fields)
+            .filter(([, value]) => Boolean(value))
+            .map(([key, value]) => [key, { code: value || "", notes: entry.notes || "" }]))
+          return { id: entry.entry_id, title: entry.topic, description: entry.category, snippets }
+        })
+        setLanguages(loadedLanguages)
+        setSnippets(loadedSnippets)
+        setSyntaxTopics(loadedSyntax)
+        if (loadedLanguages.length) {
+          const initial = loadedLanguages[0]
+          const initialBuffers = Object.fromEntries(loadedLanguages.map((item) => [
+            item.id,
+            getStarterCode(item.id, loadedSnippets, loadedSyntax),
+          ]))
+          setLang(initial.id)
+          setCodeByLanguage(initialBuffers)
+          setCode(initialBuffers[initial.id] || "")
+        } else {
+          setLoadError("No active compiler languages are available from the API.")
+        }
+      })
+      .catch(() => alive && setLoadError("Could not load compiler languages and examples. Check the API connection and try refreshing."))
+    return () => { alive = false }
+  }, [])
 
   const handleLangChange = (l: string) => {
+    const nextCode = codeByLanguage[l] ?? getStarterCode(l, snippets, syntaxTopics)
+    setCodeByLanguage((buffers) => ({ ...buffers, [lang]: code, [l]: nextCode }))
     setLang(l)
-    setCode(STARTER_CODE[l] || "")
+    setCode(nextCode)
     setOutput("")
+    setCompilerDiagnostics([])
     setStatus("idle")
-    if (l === "html") {
+    if (l === "html" || l === "css") {
       setActiveOutputTab("preview")
     } else {
       setActiveOutputTab("console")
@@ -316,32 +168,61 @@ export default function Compiler() {
 
   const handleLoadCodeFromModal = useCallback(
     (newCode: string, newLang: string) => {
+      setCodeByLanguage((buffers) => ({ ...buffers, [lang]: code, [newLang]: newCode }))
       setLang(newLang)
       setCode(newCode)
       setOutput("")
+      setCompilerDiagnostics([])
       setStatus("idle")
       setActiveOutputTab("console")
     },
-    [],
+    [code, lang],
   )
 
-  const runCode = () => {
+  const handleCodeChange = (nextCode: string) => {
+    setCode(nextCode)
+    setCompilerDiagnostics([])
+    setCodeByLanguage((buffers) => ({ ...buffers, [lang]: nextCode }))
+  }
+
+  const runCode = async () => {
+    if (lang === "html" || lang === "css") {
+      setStatus("success")
+      setOutput("HTML/CSS preview updated locally.")
+      setActiveOutputTab("preview")
+      return
+    }
+    if (!code.trim()) {
+      setStatus("error")
+      setOutput("Enter code before running it.")
+      return
+    }
     setStatus("running")
     setOutput("")
-    setTimeout(() => {
-      if (code.trim() === "") {
-        setStatus("error")
-        setOutput("Error: No code to run. Write some code first!")
+    setCompilerDiagnostics([])
+    try {
+      const { data } = await api.post("/actions/execute-code/", { language: currentLang.label, code, stdin: input })
+      setStatus(data.success ? "success" : "error")
+      const resultOutput = data.output || "Program completed with no output."
+      setCompilerDiagnostics(parseCompilerDiagnostics(resultOutput, currentLang.filename))
+      if (!data.success && /EOFError|NoSuchElementException|end of input|no line found|unexpected end of input/i.test(resultOutput)) {
+        setShowInput(true)
+        setOutput(`This program requested standard input, but the stdin box was empty. Enter the input your program expects and run it again.\n\n${resultOutput}`)
       } else {
-        setStatus("success")
-        setOutput(MOCK_OUTPUTS[lang] || "Code executed successfully.")
+        setOutput(resultOutput)
       }
-    }, 900)
+    } catch (error: any) {
+      setStatus("error")
+      setOutput(error?.response?.data?.detail || "Could not run this program. Check your API connection and try again.")
+    }
   }
 
   const reset = () => {
-    setCode(STARTER_CODE[lang] || "")
+    const starterCode = getStarterCode(lang, snippets, syntaxTopics)
+    setCode(starterCode)
+    setCodeByLanguage((buffers) => ({ ...buffers, [lang]: starterCode }))
     setOutput("")
+    setCompilerDiagnostics([])
     setStatus("idle")
   }
 
@@ -362,6 +243,33 @@ export default function Compiler() {
     running: "Running...",
     success: "Success",
     error: "Error",
+  }
+  const htmlSource = lang === "html" ? code : codeByLanguage.html ?? getStarterCode("html", snippets, syntaxTopics)
+  const cssSource = lang === "css" ? code : codeByLanguage.css ?? ""
+  const inlineStyle = cssSource
+    ? `<style>${cssSource.replace(/<\/style/gi, "<\\/style")}</style>`
+    : ""
+  let linkedCssReplaced = false
+  let previewMarkup = htmlSource.replace(/<link\b[^>]*>/gi, (linkTag) => {
+    const href = linkTag.match(/\bhref\s*=\s*["']([^"']+)["']/i)?.[1]
+    if (inlineStyle && href && !/^(?:https?:|\/\/|data:)/i.test(href) && /\.css(?:[?#].*)?$/i.test(href)) {
+      linkedCssReplaced = true
+      return inlineStyle
+    }
+    return linkTag
+  })
+  if (inlineStyle && !linkedCssReplaced) {
+    previewMarkup = /<head\b[^>]*>/i.test(previewMarkup)
+      ? previewMarkup.replace(/<head\b[^>]*>/i, (head) => `${head}${inlineStyle}`)
+      : `${inlineStyle}${previewMarkup}`
+  }
+  const previewPolicy = '<meta http-equiv="Content-Security-Policy" content="default-src \'none\'; img-src data: blob:; style-src \'unsafe-inline\' https:; script-src \'unsafe-inline\'; connect-src \'none\'; form-action \'none\'; base-uri \'none\'; object-src \'none\'">'
+  const previewDocument = /<head\b[^>]*>/i.test(previewMarkup)
+    ? previewMarkup.replace(/<head\b[^>]*>/i, (head) => `${head}${previewPolicy}`)
+    : `${previewPolicy}${previewMarkup}`
+
+  if (!currentLang) {
+    return <div className="min-h-[calc(100vh-64px)] bg-slate-950 flex items-center justify-center p-6 text-center text-slate-300">{loadError || "Loading compiler languages…"}</div>
   }
 
   return (
@@ -387,7 +295,7 @@ export default function Compiler() {
 
         {/* Language selector buttons */}
         <div className="flex items-center gap-1 bg-slate-800/80 rounded-lg p-1 overflow-x-auto border border-slate-700/50">
-          {LANGUAGES.map((l) => (
+          {languages.map((l) => (
             <button
               key={l.id}
               onClick={() => handleLangChange(l.id)}
@@ -407,11 +315,11 @@ export default function Compiler() {
         <button
           onClick={() => setShowSyntaxModal(true)}
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-950 text-indigo-300 hover:bg-indigo-900 border border-indigo-700/60 transition-colors shadow-sm"
-          title="Compare syntax between Python, Java, C, and C++"
+          title="Compare syntax examples from the API"
         >
           <Lightbulb className="w-3.5 h-3.5 text-amber-400" />
           <span className="hidden sm:inline">Compare Syntax:</span>
-          <span>Python vs Java vs C vs C++</span>
+          <span>Compare Syntax</span>
         </button>
 
         {/* Right Toolbar Actions */}
@@ -500,6 +408,28 @@ export default function Compiler() {
             )}
           </button>
         </div>
+
+        {snippets.some((snippet) => normalize(snippet.language) === lang) && (
+          <select
+            aria-label="Load saved code example"
+            value={snippets.find((snippet) => normalize(snippet.language) === lang && snippet.code === code)?.snippet_id || ""}
+            onChange={(event) => {
+              const snippet = snippets.find((item) => item.snippet_id === event.target.value)
+              if (snippet) {
+                setCode(snippet.code)
+                setCodeByLanguage((buffers) => ({ ...buffers, [lang]: snippet.code }))
+                setOutput("")
+                setStatus("idle")
+              }
+            }}
+            className="max-w-48 bg-slate-800 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-slate-200"
+          >
+            <option value="">API examples</option>
+            {snippets.filter((snippet) => normalize(snippet.language) === lang).map((snippet) => (
+              <option key={snippet.snippet_id} value={snippet.snippet_id}>{snippet.title}</option>
+            ))}
+          </select>
+        )}
       </div>
 
       {/* Language Syntax Highlight Info Banner */}
@@ -510,13 +440,7 @@ export default function Compiler() {
             <span>{currentLang.label}</span>
           </span>
           <span className="text-slate-600">|</span>
-          <span className="text-slate-400 hidden sm:inline">
-            {currentLang.paradigm}
-          </span>
-          <span className="text-slate-600 hidden sm:inline">|</span>
-          <span className="text-slate-400 truncate max-w-md md:max-w-xl font-mono text-[11px]">
-            {currentLang.syntaxSummary}
-          </span>
+          <span className="text-slate-400 hidden sm:inline">Loaded from compiler API</span>
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <span className="px-2 py-0.5 rounded-full bg-slate-800 border border-slate-700/60 text-[10px] text-slate-400 font-mono">
@@ -554,9 +478,11 @@ export default function Compiler() {
           <div className="flex-1 flex overflow-hidden bg-slate-950">
             <CodeEditor
               code={code}
-              onChange={setCode}
+              onChange={handleCodeChange}
               language={lang}
               fontSize={fontSize}
+              diagnostics={compilerDiagnostics}
+              navigationTarget={diagnosticTarget}
               onCursorChange={(line, col) => {
                 setCursorLine(line)
                 setCursorCol(col)
@@ -583,7 +509,7 @@ export default function Compiler() {
               >
                 Output / Console
               </button>
-              {lang === "html" && (
+              {(lang === "html" || lang === "css") && (
                 <button
                   onClick={() => setActiveOutputTab("preview")}
                   className={`inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-md font-medium transition-colors ${
@@ -637,12 +563,32 @@ export default function Compiler() {
 
           {/* Output Content Area */}
           <div className="flex-1 p-4 overflow-auto bg-slate-950">
-            {lang === "html" && activeOutputTab === "preview" ? (
+            {compilerDiagnostics.length > 0 && (
+              <section aria-label="Problems" className="mb-4 rounded-lg border border-slate-700 bg-slate-900/80">
+                <div className="px-3 py-2 border-b border-slate-700 text-xs font-semibold text-slate-200">
+                  Problems <span className="ml-2 text-red-300">{compilerDiagnostics.filter((item) => item.severity === "error").length} errors</span>
+                  {compilerDiagnostics.some((item) => item.severity === "warning") && <span className="ml-2 text-amber-300">{compilerDiagnostics.filter((item) => item.severity === "warning").length} warnings</span>}
+                </div>
+                <ul className="max-h-40 overflow-auto divide-y divide-slate-800">
+                  {compilerDiagnostics.map((item, index) => (
+                    <li key={`${item.code}-${item.startLine}-${index}`}>
+                      <button type="button" disabled={!item.startLine} onClick={() => item.startLine && setDiagnosticTarget({ line: item.startLine, column: item.startColumn || 1 })} className="w-full text-left px-3 py-2 hover:bg-slate-800 disabled:cursor-default">
+                        <span className={item.severity === "warning" ? "text-amber-300" : "text-red-300"}>{item.severity.toUpperCase()}</span>
+                        {item.startLine ? <span className="ml-2 text-slate-500">{item.file}:{item.startLine}{item.startColumn ? `:${item.startColumn}` : ""}</span> : null}
+                        <span className="ml-2 text-slate-200">{item.message}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
+            {(lang === "html" || lang === "css") && activeOutputTab === "preview" ? (
               <div className="h-full w-full rounded-xl overflow-hidden bg-white shadow-inner border border-slate-700">
                 <iframe
                   title="HTML Live Preview"
-                  srcDoc={code}
+                  srcDoc={previewDocument}
                   sandbox="allow-scripts"
+                  referrerPolicy="no-referrer"
                   className="w-full h-full border-0"
                 />
               </div>
@@ -736,6 +682,8 @@ export default function Compiler() {
         isOpen={showSyntaxModal}
         onClose={() => setShowSyntaxModal(false)}
         onLoadCode={handleLoadCodeFromModal}
+        topics={syntaxTopics}
+        languages={languages}
       />
     </div>
   )

@@ -1,39 +1,42 @@
 import api from "./client"
+import { asList, asRecord } from "./data"
 
-export const getDiscussions = async () => {
-  const response = await api.get("/community/posts/")
-
-  return response.data
+export interface ApiDiscussion {
+  discussion_id: string
+  title: string
+  content: string
+  code?: string
+  language?: string
+  tag: string
+  author_name: string
+  author_profile?: string
+  likes_count: number
+  comments_count: number
+  is_solved: boolean
+  is_pinned: boolean
+  created_at: string
+  replies?: { reply_id: string; user_name: string; content: string; created_at: string }[]
 }
 
-export const getDiscussion = async (id: number) => {
-  const response = await api.get(`/community/posts/${id}/`)
+export const getDiscussions = async () => {
+  const { data } = await api.get("/discussions/")
+  return asList<ApiDiscussion>(data, "discussions")
+}
 
-  return response.data
+export const getDiscussion = async (id: string | number) => {
+  const { data } = await api.get(`/discussions/${encodeURIComponent(String(id))}/`)
+  return asRecord<ApiDiscussion>(data, "discussion")
 }
 
 export const createDiscussion = async (data: {
   title: string
 
   content: string
-
+  user_id: string
+  tag?: string
   code?: string
-
-  code_language?: number
-
-  tags?: number[]
+  language?: string
 }) => {
-  const response = await api.post(
-    "/community/posts/",
-
-    data,
-  )
-
-  return response.data
-}
-
-export const likeDiscussion = async (id: number) => {
-  const response = await api.post(`/community/posts/${id}/like/`)
-
+  const response = await api.post("/discussions/", data)
   return response.data
 }

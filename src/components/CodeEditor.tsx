@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useMemo, useCallback } from "react"
+import React, { useState, useRef, useEffect, useMemo, useCallback } from "react"
 import { highlightCode, normalizeLanguage } from "../utils/highlighter"
 
 export interface CodeEditorProps {
@@ -10,6 +10,8 @@ export interface CodeEditorProps {
   readOnly?: boolean
   className?: string
   onCursorChange?: (line: number, col: number) => void
+  diagnostics?: { severity: "error" | "warning" | "info"; startLine?: number; startColumn?: number; endColumn?: number; message: string }[]
+  navigationTarget?: { line: number; column: number } | null
 }
 
 const FONT_SIZE_STYLES = {
@@ -39,10 +41,13 @@ export default function CodeEditor({
   readOnly = false,
   className = "",
   onCursorChange,
+  diagnostics = [],
+  navigationTarget,
 }: CodeEditorProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const preRef = useRef<HTMLPreElement>(null)
   const lineNumbersRef = useRef<HTMLDivElement>(null)
+  const diagnosticsLayerRef = useRef<HTMLDivElement>(null)
 
   const [activeLine, setActiveLine] = useState(1)
   const [activeCol, setActiveCol] = useState(1)
@@ -69,7 +74,25 @@ export default function CodeEditor({
     if (lineNumbersRef.current) {
       lineNumbersRef.current.scrollTop = scrollTop
     }
+    if (diagnosticsLayerRef.current) {
+      diagnosticsLayerRef.current.scrollTop = scrollTop
+      diagnosticsLayerRef.current.scrollLeft = scrollLeft
+    }
   }, [])
+
+  const currentFont = FONT_SIZE_STYLES[fontSize] ?? FONT_SIZE_STYLES.sm
+
+  useEffect(() => {
+    if (!navigationTarget || !textareaRef.current) return
+    const { line, column } = navigationTarget
+    const offset = code.split("\n").slice(0, Math.max(0, line - 1)).reduce((sum, value) => sum + value.length + 1, 0) + Math.max(0, column - 1)
+    textareaRef.current.focus()
+    textareaRef.current.setSelectionRange(offset, offset)
+    const lineHeight = parseInt(currentFont.lineHeight, 10)
+    textareaRef.current.scrollTop = Math.max(0, (line - 1) * lineHeight - lineHeight * 3)
+    syncScroll()
+    setActiveLine(line)
+  }, [navigationTarget, code, currentFont.lineHeight, syncScroll])
 
   // Update cursor position and active line
   const updateCursorPosition = useCallback(() => {
@@ -95,6 +118,26 @@ export default function CodeEditor({
     if (readOnly) return
     const textarea = e.currentTarget
     const { selectionStart, selectionEnd, value } = textarea
+
+    // Complete HTML opening tags as the user types `>`.
+    if (e.key === ">" && normalized === "markup" && selectionStart === selectionEnd) {
+      const before = value.slice(0, selectionStart)
+      const after = value.slice(selectionEnd)
+      const openingTag = before.match(/<([A-Za-z][\w:-]*)\b[^<>]*$/)
+      const voidTags = new Set(["area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source", "track", "wbr"])
+      const tagName = openingTag?.[1]
+      if (tagName && !voidTags.has(tagName.toLowerCase()) && !/\/\s*$/.test(before) && !/^\s*\/>/.test(after)) {
+        e.preventDefault()
+        const closingTag = `</${tagName}>`
+        const newText = `${before}>${closingTag}${after}`
+        onChange(newText)
+        setTimeout(() => {
+          textarea.selectionStart = textarea.selectionEnd = selectionStart + 1
+          updateCursorPosition()
+        }, 0)
+        return
+      }
+    }
 
     // TAB key handling
     if (e.key === "Tab") {
@@ -255,7 +298,7 @@ export default function CodeEditor({
     }
   }
 
-  const currentFont = FONT_SIZE_STYLES[fontSize] || FONT_SIZE_STYLES.sm
+
 
   return (
     <div
@@ -275,15 +318,18 @@ export default function CodeEditor({
         {lines.map((_, idx) => {
           const lineNum = idx + 1
           const isCurrent = lineNum === activeLine
+          const lineDiagnostic = diagnostics.find((item) => item.startLine === lineNum)
           return (
             <div
               key={lineNum}
-              className={`transition-colors font-mono ${
+              className={`relative transition-colors font-mono ${
                 isCurrent
                   ? "text-indigo-400 font-bold bg-indigo-500/10 -mr-3 pr-3 rounded-l"
                   : "text-slate-600 hover:text-slate-400"
               }`}
+              title={lineDiagnostic?.message}
             >
+              {lineDiagnostic && <span aria-hidden="true" className={`absolute left-1 top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full ${lineDiagnostic.severity === "warning" ? "bg-amber-400" : lineDiagnostic.severity === "info" ? "bg-sky-400" : "bg-red-500"}`} />}
               {lineNum}
             </div>
           )
@@ -321,6 +367,18 @@ export default function CodeEditor({
             }}
           />
         </pre>
+
+        <div ref={diagnosticsLayerRef} aria-hidden="true" className="absolute inset-0 m-0 p-4 overflow-hidden pointer-events-none font-mono" style={{ fontFamily: "'JetBrains Mono', 'Fira Code', monospace", fontSize: currentFont.fontSize, lineHeight: currentFont.lineHeight, tabSize: 4 }}>
+          {diagnostics.filter((item) => item.startLine && item.startColumn).map((item, index) => {
+            const size = parseInt(currentFont.fontSize, 10)
+            const lineHeight = parseInt(currentFont.lineHeight, 10)
+            const charWidth = size * 0.602
+            const sourceLine = lines[item.startLine! - 1] || ""
+            const start = Math.max(0, item.startColumn! - 1)
+            const length = Math.max(1, Math.min(sourceLine.length - start || 1, item.endColumn ? item.endColumn - item.startColumn! : 1))
+            return <span key={`${item.startLine}:${item.startColumn}:${index}`} title={item.message} className={`absolute border-b-2 ${item.severity === "warning" ? "border-amber-400" : item.severity === "info" ? "border-sky-400" : "border-red-500"}`} style={{ left: `calc(1rem + ${start * charWidth}px)`, top: `calc(1rem + ${(item.startLine! - 1) * lineHeight + lineHeight - 3}px)`, width: `${length * charWidth}px`, borderBottomStyle: "wavy" as React.CSSProperties["borderBottomStyle"] }} />
+          })}
+        </div>
 
         {/* Interactive Textarea Layer (on top, text transparent, caret visible) */}
         <textarea

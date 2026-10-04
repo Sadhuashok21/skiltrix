@@ -15,10 +15,15 @@ import {
   Target,
 } from "lucide-react"
 import logoImg from "../assets/logo.png"
+import { useSkiltrixData } from "../context/SkiltrixDataContext"
+import { getGlobalSignInUrl, logoutUser } from "../api/auth"
+import { useAuth } from "../auth"
 
 const navLinks = [
   { label: "Home", to: "/" },
   { label: "Courses", to: "/courses" },
+  { label: "CodeLab", to: "/codelab" },
+  { label: "SAP ABAP", to: "/abap" },
   { label: "Practice", to: "/practice" },
   { label: "Videos", to: "/videos" },
   { label: "Quizzes", to: "/quizzes" },
@@ -27,12 +32,26 @@ const navLinks = [
 ]
 
 export default function Navbar() {
+  const { notifications, profile, progress } = useSkiltrixData()
+  const { user: authUser, isAuthenticated } = useAuth()
   const location = useLocation()
   const [mobileOpen, setMobileOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
   const [notifOpen, setNotifOpen] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
   const [darkMode, setDarkMode] = useState(false)
+  const hasToken = Boolean(localStorage.getItem("skiltrix_access_token") || localStorage.getItem("access_token"))
+  const isSignedIn = Boolean(isAuthenticated && authUser) || (hasToken && Boolean(localStorage.getItem("user_id")))
+  const user = (profile?.user as Record<string, unknown> | undefined) || (authUser as unknown as Record<string, unknown> | undefined)
+  const userName = [user?.name, user?.lastname].filter(Boolean).join(" ") || String(user?.username ?? (authUser?.name || "Learner"))
+  const userInitials = userName.split(/\s+/).map((part) => part[0]).join("").slice(0, 2).toUpperCase()
+  const recentNotifications = (notifications || []).slice(0, 3).map((notice) => ({
+    id: String(notice.notification_id),
+    text: String(notice.title ?? "Notification"),
+    time: notice.created_at ? new Date(String(notice.created_at)).toLocaleString() : "",
+    color: "bg-indigo-50",
+    icon: notice.category === "Achievements" ? <Trophy className="w-4 h-4 text-amber-500" /> : notice.category === "Community" ? <MessageSquare className="w-4 h-4 text-blue-500" /> : <CheckCircle2 className="w-4 h-4 text-green-500" />,
+  }))
 
   return (
     <>
@@ -141,173 +160,171 @@ export default function Navbar() {
                 )}
               </button>
 
-              {/* Notifications */}
-              <div className="relative">
-                <button
-                  onClick={() => {
-                    setNotifOpen(!notifOpen)
-                    setProfileOpen(false)
-                  }}
-                  className="relative p-2 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-lg"
-                  aria-label="Notifications"
-                >
-                  <svg
-                    className="w-5 h-5"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={2}
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0"
-                    />
-                  </svg>
-                  <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full" />
-                </button>
-                {notifOpen && (
-                  <div className="absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-xl border border-slate-200 py-2 z-50">
-                    <div className="px-4 py-2 border-b border-slate-100 flex items-center justify-between">
-                      <span className="font-semibold text-slate-900 text-sm">
-                        Notifications
-                      </span>
-                      <Link
-                        to="/notifications"
-                        className="text-xs text-indigo-600 hover:underline"
-                        onClick={() => setNotifOpen(false)}
+              {isSignedIn ? (
+                <>
+                  {/* Notifications */}
+                  <div className="relative">
+                    <button
+                      onClick={() => {
+                        setNotifOpen(!notifOpen)
+                        setProfileOpen(false)
+                      }}
+                      className="relative p-2 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-lg"
+                      aria-label="Notifications"
+                    >
+                      <svg
+                        className="w-5 h-5"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={2}
                       >
-                        View all
-                      </Link>
-                    </div>
-                    {[
-                      {
-                        icon: <Trophy className="w-4 h-4 text-amber-500" />,
-                        text: "You earned the Python Beginner badge!",
-                        time: "2m ago",
-                        color: "bg-yellow-50",
-                      },
-                      {
-                        icon: <MessageSquare className="w-4 h-4 text-blue-500" />,
-                        text: "Alex replied to your question",
-                        time: "15m ago",
-                        color: "bg-blue-50",
-                      },
-                      {
-                        icon: <CheckCircle2 className="w-4 h-4 text-green-500" />,
-                        text: "Quiz completed: JavaScript Basics — 92%",
-                        time: "1h ago",
-                        color: "bg-green-50",
-                      },
-                    ].map((n, i) => (
-                      <div
-                        key={i}
-                        className={`px-4 py-3 hover:bg-slate-50 cursor-pointer flex gap-3 items-start`}
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0"
+                        />
+                      </svg>
+                      {notifications.some((notice) => !notice.read) && (
+                        <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full" />
+                      )}
+                    </button>
+                    {notifOpen && (
+                      <div className="absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-xl border border-slate-200 py-2 z-50">
+                        <div className="px-4 py-2 border-b border-slate-100 flex items-center justify-between">
+                          <span className="font-semibold text-slate-900 text-sm">
+                            Notifications
+                          </span>
+                          <Link
+                            to="/notifications"
+                            className="text-xs text-indigo-600 hover:underline"
+                            onClick={() => setNotifOpen(false)}
+                          >
+                            View all
+                          </Link>
+                        </div>
+                        {recentNotifications.map((n) => (
+                          <div key={n.id} className="px-4 py-3 hover:bg-slate-50 flex gap-3 items-start">
+                            <span className={`w-8 h-8 rounded-lg ${n.color} flex items-center justify-center shrink-0`}>
+                              {n.icon}
+                            </span>
+                            <div>
+                              <p className="text-sm text-slate-700">{n.text}</p>
+                              <p className="text-xs text-slate-400 mt-0.5">{n.time}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Profile */}
+                  <div className="relative">
+                    <button
+                      onClick={() => {
+                        setProfileOpen(!profileOpen)
+                        setNotifOpen(false)
+                      }}
+                      className="flex items-center gap-2 p-1.5 rounded-lg hover:bg-slate-100"
+                      aria-label="Profile menu"
+                    >
+                      <div className="w-7 h-7 rounded-full bg-gradient-to-br from-indigo-500 to-violet-500 flex items-center justify-center text-white text-xs font-bold">
+                        {userInitials || "?"}
+                      </div>
+                      <svg
+                        className="w-4 h-4 text-slate-500 hidden md:block"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={2}
                       >
-                        <span
-                          className={`w-8 h-8 rounded-lg ${n.color} flex items-center justify-center text-base shrink-0`}
-                        >
-                          {n.icon}
-                        </span>
-                        <div>
-                          <p className="text-sm text-slate-700">{n.text}</p>
-                          <p className="text-xs text-slate-400 mt-0.5">
-                            {n.time}
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M19.5 8.25l-7.5 7.5-7.5-7.5"
+                        />
+                      </svg>
+                    </button>
+                    {profileOpen && (
+                      <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-xl border border-slate-200 py-2 z-50">
+                        <div className="px-4 py-3 border-b border-slate-100">
+                          <p className="text-sm font-semibold text-slate-900">
+                            {userName}
                           </p>
+                          <p className="text-xs text-slate-500">
+                            {String(user?.email ?? "")}
+                          </p>
+                          <div className="mt-2 flex items-center gap-1.5">
+                            <span className="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full font-medium">
+                              Level {Math.floor(Number(progress?.xp ?? 0) / 1000) + 1}
+                            </span>
+                            <span className="text-xs text-slate-500 flex items-center gap-1">
+                              <Flame className="w-3.5 h-3.5 text-amber-500" />
+                              <span>{progress?.streak ?? 0}-day streak</span>
+                            </span>
+                          </div>
+                        </div>
+                        {[
+                          {
+                            label: "My Profile",
+                            to: "/profile",
+                            icon: <User className="w-4 h-4 text-slate-500" />,
+                          },
+                          {
+                            label: "Progress",
+                            to: "/progress",
+                            icon: <BarChart3 className="w-4 h-4 text-slate-500" />,
+                          },
+                          {
+                            label: "Dashboard",
+                            to: "/dashboard",
+                            icon: <LayoutDashboard className="w-4 h-4 text-slate-500" />,
+                          },
+                          {
+                            label: "Settings",
+                            to: "/profile",
+                            icon: <Settings className="w-4 h-4 text-slate-500" />,
+                          },
+                        ].map((item) => (
+                          <Link
+                            key={item.to}
+                            to={item.to}
+                            onClick={() => setProfileOpen(false)}
+                            className="flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50"
+                          >
+                            <span>{item.icon}</span>
+                            {item.label}
+                          </Link>
+                        ))}
+                        <div className="border-t border-slate-100 mt-1">
+                          <button
+                            onClick={logoutUser}
+                            className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-500 hover:bg-red-50"
+                          >
+                            <LogOut className="w-4 h-4 text-red-500" />
+                            <span>Sign Out</span>
+                          </button>
                         </div>
                       </div>
-                    ))}
+                    )}
                   </div>
-                )}
-              </div>
-
-              {/* Profile */}
-              <div className="relative">
-                <button
-                  onClick={() => {
-                    setProfileOpen(!profileOpen)
-                    setNotifOpen(false)
-                  }}
-                  className="flex items-center gap-2 p-1.5 rounded-lg hover:bg-slate-100"
-                  aria-label="Profile menu"
-                >
-                  <div className="w-7 h-7 rounded-full bg-gradient-to-br from-indigo-500 to-violet-500 flex items-center justify-center text-white text-xs font-bold">
-                    JD
-                  </div>
-                  <svg
-                    className="w-4 h-4 text-slate-500 hidden md:block"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={2}
+                </>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <a
+                    href={getGlobalSignInUrl()}
+                    className="inline-flex items-center justify-center px-3.5 py-1.5 text-sm font-semibold text-slate-700 hover:text-indigo-600 hover:bg-slate-100 rounded-lg transition-colors"
                   >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M19.5 8.25l-7.5 7.5-7.5-7.5"
-                    />
-                  </svg>
-                </button>
-                {profileOpen && (
-                  <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-xl border border-slate-200 py-2 z-50">
-                    <div className="px-4 py-3 border-b border-slate-100">
-                      <p className="text-sm font-semibold text-slate-900">
-                        Jordan Davis
-                      </p>
-                      <p className="text-xs text-slate-500">
-                        jordan@example.com
-                      </p>
-                      <div className="mt-2 flex items-center gap-1.5">
-                        <span className="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full font-medium">
-                          Level 12
-                        </span>
-                        <span className="text-xs text-slate-500 flex items-center gap-1">
-                          <Flame className="w-3.5 h-3.5 text-amber-500" />
-                          <span>14-day streak</span>
-                        </span>
-                      </div>
-                    </div>
-                    {[
-                      {
-                        label: "My Profile",
-                        to: "/profile",
-                        icon: <User className="w-4 h-4 text-slate-500" />,
-                      },
-                      {
-                        label: "Progress",
-                        to: "/progress",
-                        icon: <BarChart3 className="w-4 h-4 text-slate-500" />,
-                      },
-                      {
-                        label: "Dashboard",
-                        to: "/dashboard",
-                        icon: <LayoutDashboard className="w-4 h-4 text-slate-500" />,
-                      },
-                      {
-                        label: "Settings",
-                        to: "/profile",
-                        icon: <Settings className="w-4 h-4 text-slate-500" />,
-                      },
-                    ].map((item) => (
-                      <Link
-                        key={item.to}
-                        to={item.to}
-                        onClick={() => setProfileOpen(false)}
-                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50"
-                      >
-                        <span>{item.icon}</span>
-                        {item.label}
-                      </Link>
-                    ))}
-                    <div className="border-t border-slate-100 mt-1">
-                      <button className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-500 hover:bg-red-50">
-                        <LogOut className="w-4 h-4 text-red-500" />
-                        <span>Sign Out</span>
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
+                    Sign In
+                  </a>
+                  <a
+                    href={getGlobalSignInUrl().replace('/login', '/signup')}
+                    className="hidden sm:inline-flex items-center justify-center px-3.5 py-1.5 text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow-sm transition-colors"
+                  >
+                    Get Started
+                  </a>
+                </div>
+              )}
 
               {/* Mobile menu toggle */}
               <button
@@ -366,6 +383,37 @@ export default function Navbar() {
                 {link.label}
               </Link>
             ))}
+            <div className="pt-3 border-t border-slate-100 mt-2">
+              {isSignedIn ? (
+                <button
+                  onClick={() => {
+                    setMobileOpen(false)
+                    logoutUser()
+                  }}
+                  className="w-full flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-red-500 hover:bg-red-50 rounded-lg"
+                >
+                  <LogOut className="w-4 h-4 text-red-500" />
+                  <span>Sign Out ({userName})</span>
+                </button>
+              ) : (
+                <div className="flex flex-col gap-2 pt-1">
+                  <a
+                    href={getGlobalSignInUrl()}
+                    onClick={() => setMobileOpen(false)}
+                    className="block w-full text-center px-4 py-2.5 text-sm font-semibold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded-xl"
+                  >
+                    Sign In
+                  </a>
+                  <a
+                    href={getGlobalSignInUrl().replace('/login', '/signup')}
+                    onClick={() => setMobileOpen(false)}
+                    className="block w-full text-center px-4 py-2.5 text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-sm"
+                  >
+                    Get Started
+                  </a>
+                </div>
+              )}
+            </div>
           </div>
         )}
       </nav>

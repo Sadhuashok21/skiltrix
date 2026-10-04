@@ -1,6 +1,8 @@
 import { useState } from "react"
 import { Link } from "react-router-dom"
-import { codingProblems } from "../data/mockData"
+import { useSkiltrixData } from "../context/SkiltrixDataContext"
+import { mapProblem } from "../data/apiAdapters"
+import { getProblem, submitProblem, runSampleProblem, type ApiProblem, type TestCaseResult } from "../api/practice"
 import CodeEditor from "../components/CodeEditor"
 import CodeBlock from "../components/CodeBlock"
 import { TechIcon } from "../components/TechIcons"
@@ -11,6 +13,7 @@ import {
   Trophy,
   Terminal,
   Loader2,
+  Lock,
 } from "lucide-react"
 
 const difficultyColors: Record<string, string> = {
@@ -163,15 +166,22 @@ console.log(twoSum(nums, target)); // Expected: [0, 1]`,
 }
 
 export default function Practice() {
+  const { problems: apiProblems, refresh } = useSkiltrixData()
+  const codingProblems = apiProblems.map(mapProblem)
   const [view, setView] = useState<"list" | "problem">("list")
   const [selectedDiff, setSelectedDiff] = useState("All")
   const [selectedTopic, setSelectedTopic] = useState("All")
   const [practiceLang, setPracticeLang] = useState<PracticeLangKey>("python")
-  const [code, setCode] = useState(PRACTICE_STARTERS.python)
+  const [code, setCode] = useState("")
   const [output, setOutput] = useState("")
   const [running, setRunning] = useState(false)
   const [submitted, setSubmitted] = useState(false)
+  const [testResults, setTestResults] = useState<TestCaseResult[]>([])
+  const [overallVerdict, setOverallVerdict] = useState<string | null>(null)
+  const [activeTestTab, setActiveTestTab] = useState(0)
+  const [testDuration, setTestDuration] = useState<number>(0)
   const [activeTab, setActiveTab] = useState("Description")
+  const [activeProblem, setActiveProblem] = useState<ApiProblem | null>(null)
 
   const filtered = codingProblems.filter((p) => {
     const matchDiff = selectedDiff === "All" || p.difficulty === selectedDiff
@@ -194,33 +204,74 @@ export default function Practice() {
 
   const handleLangSelect = (newLang: PracticeLangKey) => {
     setPracticeLang(newLang)
-    setCode(PRACTICE_STARTERS[newLang])
+    setCode(activeProblem?.starter_codes?.[newLang] ?? "")
     setOutput("")
   }
 
-  const runCode = () => {
-    setRunning(true)
-    setOutput("")
-    setTimeout(() => {
-      setRunning(false)
-      setOutput(
-        `Running test cases in ${practiceLang.toUpperCase()}...\n\n` +
-          `[PASS] Test 1: nums=[2,7,11,15], target=9  ->  [0, 1]\n` +
-          `[PASS] Test 2: nums=[3,2,4], target=6      ->  [1, 2]\n` +
-          `[PASS] Test 3: nums=[3,3], target=6         ->  [0, 1]\n\n` +
-          `All 3/3 test cases passed!\n` +
-          `Runtime: 38ms | Memory: 14.1 MB`,
-      )
-    }, 1200)
+  const openProblem = async (problemId: string | number) => {
+    setActiveProblem(null)
+    setView("problem")
+    setActiveTab("Description")
+    try {
+      const problem = await getProblem(String(problemId))
+      setActiveProblem(problem)
+      setCode(problem.starter_codes?.[practiceLang] || "")
+    } catch {
+      setOutput("Problem details could not be loaded from the API.")
+    }
   }
 
-  const submit = () => {
+  const runCode = async () => {
+    if (!activeProblem) return
     setRunning(true)
-    setTimeout(() => {
+    setOutput("")
+    setOverallVerdict(null)
+    setTestResults([])
+    try {
+      const res = await runSampleProblem({
+        problem_id: activeProblem.problem_id,
+        language: practiceLang,
+        code,
+      })
+      setOverallVerdict(res.verdict)
+      setTestResults(res.test_results || [])
+      setTestDuration(res.duration_ms)
+      setActiveTestTab(0)
+    } catch (err: any) {
+      setOutput(err?.response?.data?.message || err.message || "Failed to execute sample code.")
+    } finally {
       setRunning(false)
-      setSubmitted(true)
-    }, 1500)
+    }
   }
+
+  const submit = async () => {
+    if (!activeProblem) return
+    setRunning(true)
+    setOutput("")
+    setOverallVerdict(null)
+    setTestResults([])
+    try {
+      const userId = localStorage.getItem("user_id") || "guest"
+      const res = await submitProblem({
+        user_id: userId,
+        problem_id: activeProblem.problem_id,
+        language: practiceLang,
+        code,
+      })
+      const result = res.result
+      setSubmitted(result?.verdict === "Accepted")
+      setOverallVerdict(result?.verdict || "Evaluated")
+      setTestResults(result?.test_results || [])
+      setTestDuration(result?.duration_ms || 0)
+      setActiveTestTab(0)
+      refresh()
+    } catch (error: any) {
+      setOutput(error?.response?.data?.message || error.message || "Submission evaluation failed.")
+    } finally {
+      setRunning(false)
+    }
+  }
+
 
   const currentLangObj =
     PRACTICE_LANGUAGES.find((l) => l.id === practiceLang) ||
@@ -344,20 +395,20 @@ export default function Practice() {
                 <div className="flex items-start gap-3 mb-4">
                   <div>
                     <span className="text-xs text-slate-400 font-medium">
-                      Problem #1
+                      {activeProblem?.problem_id || "Problem"}
                     </span>
                     <h2
                       className="text-lg font-bold text-slate-900"
                       style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}
                     >
-                      Two Sum
+                      {activeProblem?.title || "Loading problem…"}
                     </h2>
                     <div className="flex items-center gap-2 mt-1">
                       <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-green-100 text-green-700">
-                        Easy
+                        {activeProblem?.difficulty || "—"}
                       </span>
                       <span className="text-xs text-slate-400">
-                        Acceptance: 73%
+                        Acceptance: {activeProblem?.acceptance_rate ?? 0}%
                       </span>
                     </div>
                   </div>
@@ -366,47 +417,11 @@ export default function Practice() {
                 {activeTab === "Description" && (
                   <div className="space-y-4">
                     <div className="text-sm text-slate-700 leading-relaxed space-y-3">
-                      <p>
-                        Given an array of integers{" "}
-                        <code className="bg-slate-100 px-1 py-0.5 rounded text-xs font-mono text-indigo-700">
-                          nums
-                        </code>{" "}
-                        and an integer{" "}
-                        <code className="bg-slate-100 px-1 py-0.5 rounded text-xs font-mono text-indigo-700">
-                          target
-                        </code>
-                        , return indices of the two numbers such that they add
-                        up to{" "}
-                        <code className="bg-slate-100 px-1 py-0.5 rounded text-xs font-mono text-indigo-700">
-                          target
-                        </code>
-                        .
-                      </p>
-                      <p>
-                        You may assume that each input would have exactly one
-                        solution, and you may not use the same element twice.
-                      </p>
+                      <p>{activeProblem?.description || "No problem description is available."}</p>
                     </div>
 
                     <div className="space-y-3">
-                      {[
-                        {
-                          input: "nums = [2,7,11,15], target = 9",
-                          output: "[0,1]",
-                          explain:
-                            "Because nums[0] + nums[1] == 9, return [0, 1].",
-                        },
-                        {
-                          input: "nums = [3,2,4], target = 6",
-                          output: "[1,2]",
-                          explain: null,
-                        },
-                        {
-                          input: "nums = [3,3], target = 6",
-                          output: "[0,1]",
-                          explain: null,
-                        },
-                      ].map((ex, i) => (
+                      {(activeProblem?.sample_test_cases || []).map((testCase: any, i) => (
                         <div
                           key={i}
                           className="bg-slate-50 rounded-lg p-3 text-xs font-mono space-y-1 border border-slate-100"
@@ -416,22 +431,14 @@ export default function Practice() {
                           </p>
                           <p>
                             <span className="text-slate-400">Input: </span>
-                            <span className="text-slate-900">{ex.input}</span>
+                            <span className="text-slate-900">{testCase.input_data}</span>
                           </p>
                           <p>
                             <span className="text-slate-400">Output: </span>
                             <span className="text-green-600 font-semibold">
-                              {ex.output}
+                              {testCase.expected_output}
                             </span>
                           </p>
-                          {ex.explain && (
-                            <p>
-                              <span className="text-slate-400">Explain: </span>
-                              <span className="text-slate-600 font-sans">
-                                {ex.explain}
-                              </span>
-                            </p>
-                          )}
                         </div>
                       ))}
                     </div>
@@ -440,16 +447,11 @@ export default function Practice() {
                       <h4 className="text-sm font-semibold text-slate-900 mb-2">
                         Constraints:
                       </h4>
-                      <ul className="text-xs text-slate-600 space-y-1 font-mono">
-                        <li>• 2 ≤ nums.length ≤ 10⁴</li>
-                        <li>• -10⁹ ≤ nums[i] ≤ 10⁹</li>
-                        <li>• -10⁹ ≤ target ≤ 10⁹</li>
-                        <li>• Only one valid answer exists.</li>
-                      </ul>
+                      <ul className="text-xs text-slate-600 space-y-1 font-mono">{(activeProblem?.constraints || "No constraints provided.").split("\n").map((constraint, index) => <li key={index}>{constraint}</li>)}</ul>
                     </div>
 
                     <div className="flex flex-wrap gap-2 pt-2">
-                      {["Arrays", "Hash Map", "Two Pointers"].map((tag) => (
+                      {(Array.isArray(activeProblem?.topics) ? activeProblem.topics : String(activeProblem?.topics ?? "").split(",")).map((tag) => (
                         <span
                           key={tag}
                           className="text-xs bg-indigo-50 text-indigo-600 px-2.5 py-1 rounded-lg font-medium"
@@ -463,7 +465,9 @@ export default function Practice() {
 
                 {activeTab === "Hints" && (
                   <div className="space-y-3">
-                    {[
+                    {(activeProblem?.hints ?? []).map((hint, i) => <div key={i} className="bg-amber-50 border border-amber-200 rounded-lg p-3"><p className="text-xs font-semibold text-amber-700 mb-1">Hint {i + 1}</p><p className="text-sm text-slate-700">{hint}</p></div>)}
+                    {!activeProblem?.hints?.length && <p className="text-sm text-slate-500">No hints are available.</p>}
+                    {false && [
                       "A brute-force solution is O(n²) — check every pair. Can you do better?",
                       "For each number, what other number would complete the pair? (complement = target - num)",
                       "A hash map / dictionary can tell you if a complement already exists in O(1) time.",
@@ -483,28 +487,15 @@ export default function Practice() {
 
                 {activeTab === "Solutions" && (
                   <div className="space-y-4">
-                    <p className="text-xs text-slate-600 leading-relaxed">
-                      Here is the optimal{" "}
-                      <strong>O(n) Time / O(n) Space</strong> solution using a
-                      hash map in <strong>{currentLangObj.label}</strong>:
-                    </p>
+                    <p className="text-xs text-slate-600 leading-relaxed">Code sample supplied for {currentLangObj.label} by the problem record.</p>
                     <CodeBlock
-                      code={PRACTICE_STARTERS[practiceLang]}
+                      code={activeProblem?.starter_codes?.[practiceLang] ?? ""}
                       language={practiceLang}
                       filename={`solution.${currentLangObj.ext}`}
                       showLineNumbers={true}
                       maxHeight="320px"
                     />
-                    <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 text-xs text-slate-700 space-y-1">
-                      <p>
-                        <strong>Time Complexity:</strong> O(n) — single pass
-                        through the array.
-                      </p>
-                      <p>
-                        <strong>Space Complexity:</strong> O(n) — stores at most
-                        n elements in the hash map.
-                      </p>
-                    </div>
+                    
                   </div>
                 )}
               </>
@@ -551,25 +542,160 @@ export default function Practice() {
               />
             </div>
 
-            {/* Test Results Output */}
-            {output && (
-              <div className="h-44 border-t border-slate-800 bg-slate-900/90 p-4 overflow-auto">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-semibold text-slate-300">
-                    Test Execution Output
-                  </span>
+            {/* Interactive HackerRank-style Test Results Panel */}
+            {(testResults.length > 0 || output) && (
+              <div className="h-60 border-t border-slate-800 bg-[#0f141c] flex flex-col overflow-hidden select-text">
+                {/* Header Bar */}
+                <div className="flex items-center justify-between px-4 py-2 bg-slate-900 border-b border-slate-800">
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                      Evaluation Verdict:
+                    </span>
+                    {overallVerdict && (
+                      <span
+                        className={`text-xs font-extrabold px-2.5 py-0.5 rounded-full uppercase tracking-wider ${
+                          overallVerdict === "Accepted"
+                            ? "bg-emerald-950 text-emerald-400 border border-emerald-800"
+                            : "bg-red-950 text-red-400 border border-red-800"
+                        }`}
+                      >
+                        {overallVerdict}
+                      </span>
+                    )}
+                    {testResults.length > 0 && (
+                      <span className="text-xs text-slate-400 font-medium">
+                        ({testResults.filter((t) => t.verdict === "Accepted").length}/{testResults.length} test cases passed • {testDuration}ms)
+                      </span>
+                    )}
+                  </div>
+
                   <button
-                    onClick={() => setOutput("")}
-                    className="text-xs text-slate-500 hover:text-slate-300"
+                    onClick={() => {
+                      setOutput("")
+                      setTestResults([])
+                      setOverallVerdict(null)
+                    }}
+                    className="text-xs text-slate-500 hover:text-slate-300 transition-colors"
                   >
-                    Clear
+                    Clear Output
                   </button>
                 </div>
-                <pre className="text-green-400 font-mono text-xs leading-5 whitespace-pre-wrap">
-                  {output}
-                </pre>
+
+                {testResults.length > 0 ? (
+                  <div className="flex-1 flex flex-col overflow-hidden">
+                    {/* Test Case Tabs */}
+                    <div className="flex items-center gap-1.5 px-4 pt-2 bg-slate-950/50 border-b border-slate-800/80 overflow-x-auto">
+                      {testResults.map((tc, idx) => {
+                        const isAc = tc.verdict === "Accepted"
+                        const isSelected = activeTestTab === idx
+                        return (
+                          <button
+                            key={idx}
+                            onClick={() => setActiveTestTab(idx)}
+                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-t-lg text-xs font-semibold transition-colors border-t-2 ${
+                              isSelected
+                                ? "bg-[#0f141c] text-white border-indigo-500"
+                                : "bg-slate-900/60 text-slate-400 border-transparent hover:text-slate-200"
+                            }`}
+                          >
+                            <span
+                              className={`w-2 h-2 rounded-full ${
+                                isAc ? "bg-emerald-500" : "bg-red-500"
+                              }`}
+                            />
+                            <span>
+                              Case {idx + 1} {tc.is_hidden ? "(Hidden)" : ""}
+                            </span>
+                          </button>
+                        )
+                      })}
+                    </div>
+
+                    {/* Active Test Case Detail */}
+                    {testResults[activeTestTab] && (
+                      <div className="flex-1 overflow-auto p-4 space-y-3 font-mono text-xs">
+                        <div className="flex items-center justify-between text-slate-400 text-[11px]">
+                          <span>
+                            Verdict:{" "}
+                            <strong
+                              className={
+                                testResults[activeTestTab].verdict === "Accepted"
+                                  ? "text-emerald-400"
+                                  : "text-red-400"
+                              }
+                            >
+                              {testResults[activeTestTab].verdict}
+                            </strong>
+                          </span>
+                          <span>Time: {testResults[activeTestTab].execution_time_ms} ms</span>
+                        </div>
+
+                        {testResults[activeTestTab].is_hidden ? (
+                          <div className="bg-slate-900/80 border border-slate-800 rounded-lg p-3 text-slate-400 font-sans text-xs">
+                            <div className="flex items-center gap-1.5 font-bold text-slate-300">
+                              <Lock className="w-3.5 h-3.5 text-amber-400" />
+                              <span>Hidden Evaluation Test Case</span>
+                            </div>
+                            <p className="text-[11px] text-slate-500 mt-1">
+                              Inputs and outputs for hidden test cases are kept strictly confidential to verify genuine algorithmic solutions.
+                            </p>
+                          </div>
+                        ) : (
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                            <div>
+                              <div className="text-[10px] text-slate-400 uppercase font-bold mb-1">
+                                Input:
+                              </div>
+                              <pre className="bg-slate-950 p-2.5 rounded border border-slate-800 text-slate-300 overflow-x-auto whitespace-pre-wrap">
+                                {testResults[activeTestTab].input_data || "(none)"}
+                              </pre>
+                            </div>
+                            <div>
+                              <div className="text-[10px] text-slate-400 uppercase font-bold mb-1">
+                                Expected Output:
+                              </div>
+                              <pre className="bg-slate-950 p-2.5 rounded border border-slate-800 text-emerald-400 overflow-x-auto whitespace-pre-wrap">
+                                {testResults[activeTestTab].expected_output || "(none)"}
+                              </pre>
+                            </div>
+                            <div>
+                              <div className="text-[10px] text-slate-400 uppercase font-bold mb-1">
+                                Your Output:
+                              </div>
+                              <pre
+                                className={`bg-slate-950 p-2.5 rounded border overflow-x-auto whitespace-pre-wrap ${
+                                  testResults[activeTestTab].verdict === "Accepted"
+                                    ? "border-emerald-900/60 text-emerald-300"
+                                    : "border-red-900/60 text-red-300"
+                                }`}
+                              >
+                                {testResults[activeTestTab].actual_output || "(empty output)"}
+                              </pre>
+                            </div>
+                          </div>
+                        )}
+
+                        {testResults[activeTestTab].error_message && (
+                          <div className="mt-2">
+                            <div className="text-[10px] text-red-400 uppercase font-bold mb-1">
+                              Error Diagnostic:
+                            </div>
+                            <pre className="bg-red-950/20 border border-red-900/40 text-red-300 p-2.5 rounded whitespace-pre-wrap">
+                              {testResults[activeTestTab].error_message}
+                            </pre>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="p-4 font-mono text-xs text-amber-300 whitespace-pre-wrap">
+                    {output}
+                  </div>
+                )}
               </div>
             )}
+
           </div>
         </div>
       </div>
@@ -719,7 +845,7 @@ export default function Practice() {
               </div>
               <div className="col-span-5">
                 <button
-                  onClick={() => setView("problem")}
+                  onClick={() => void openProblem(prob.id)}
                   className="font-semibold text-slate-900 hover:text-indigo-600 text-left text-sm"
                 >
                   {prob.id}. {prob.title}
@@ -747,7 +873,7 @@ export default function Practice() {
               </div>
               <div className="col-span-2 text-right">
                 <button
-                  onClick={() => setView("problem")}
+                  onClick={() => void openProblem(prob.id)}
                   className="px-3.5 py-1.5 text-xs font-semibold text-indigo-600 hover:text-white bg-indigo-50 hover:bg-indigo-600 rounded-lg transition-colors"
                 >
                   Solve →

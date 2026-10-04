@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom"
-import { badges, courses } from "../data/mockData"
+import { useSkiltrixData } from "../context/SkiltrixDataContext"
+import { mapCourse } from "../data/apiAdapters"
 import { TechIcon } from "../components/TechIcons"
 import {
   BookOpen,
@@ -14,77 +15,26 @@ import {
   Lock,
 } from "lucide-react"
 
-const weeklyData = [
-  { day: "Mon", minutes: 45, problems: 2 },
-  { day: "Tue", minutes: 90, problems: 4 },
-  { day: "Wed", minutes: 30, problems: 1 },
-  { day: "Thu", minutes: 120, problems: 5 },
-  { day: "Fri", minutes: 75, problems: 3 },
-  { day: "Sat", minutes: 60, problems: 2 },
-  { day: "Sun", minutes: 0, problems: 0 },
-]
-
-const maxMin = Math.max(...weeklyData.map((d) => d.minutes))
-
-const quizPerformance = [
-  { topic: "Python Basics", score: 90, color: "bg-yellow-500" },
-  { topic: "JavaScript ES6", score: 80, color: "bg-amber-500" },
-  { topic: "DSA Arrays", score: 70, color: "bg-purple-500" },
-  { topic: "HTML & CSS", score: 95, color: "bg-blue-500" },
-]
-
-const stats = [
-  {
-    label: "Courses Completed",
-    value: "3",
-    icon: BookOpen,
-    color: "bg-blue-50 text-blue-600 border-blue-100",
-  },
-  {
-    label: "Lessons Finished",
-    value: "86",
-    icon: CheckCircle2,
-    color: "bg-emerald-50 text-emerald-600 border-emerald-100",
-  },
-  {
-    label: "Problems Solved",
-    value: "47",
-    icon: Code2,
-    color: "bg-purple-50 text-purple-600 border-purple-100",
-  },
-  {
-    label: "Quizzes Completed",
-    value: "23",
-    icon: Target,
-    color: "bg-orange-50 text-orange-600 border-orange-100",
-  },
-  {
-    label: "Videos Watched",
-    value: "38",
-    icon: PlayCircle,
-    color: "bg-cyan-50 text-cyan-600 border-cyan-100",
-  },
-  {
-    label: "Discussion Posts",
-    value: "15",
-    icon: MessageSquare,
-    color: "bg-pink-50 text-pink-600 border-pink-100",
-  },
-  {
-    label: "Current Streak",
-    value: "14 days",
-    icon: Flame,
-    color: "bg-amber-50 text-amber-600 border-amber-100",
-  },
-  {
-    label: "Total Learning Time",
-    value: "124 hrs",
-    icon: Clock,
-    color: "bg-slate-50 text-slate-600 border-slate-200",
-  },
-]
-
 export default function Progress() {
+  const { enrollments, badges: apiBadges, activity, quizAttempts, progress, profile } = useSkiltrixData()
+  const courses = enrollments.map((item) => mapCourse(item.course, item.progress_percent))
+  const weeklyData = activity.map((item) => ({ day: item.date ? new Date(String(item.date)).toLocaleDateString(undefined, { weekday: "short" }) : "—", minutes: Number(item.minutes_spent ?? 0), problems: Number(item.problems_solved ?? 0) }))
+  const maxMin = Math.max(0, ...weeklyData.map((item) => item.minutes))
+  const quizScores = new Map<string, number[]>()
+  quizAttempts.forEach((attempt) => {
+    const title = String(attempt.quiz_title ?? "Quiz")
+    quizScores.set(title, [...(quizScores.get(title) ?? []), Number(attempt.percentage ?? 0)])
+  })
+  const quizPerformance = [...quizScores.entries()].map(([topic, scores], index) => ({ topic, score: Math.round(scores.reduce((sum, score) => sum + score, 0) / scores.length), color: ["bg-yellow-500", "bg-amber-500", "bg-purple-500", "bg-blue-500"][index % 4] }))
+  const badges = apiBadges.map((badge) => ({ ...badge, name: String(badge.name ?? "Badge"), description: String(badge.description ?? ""), icon: String(badge.icon ?? "trophy"), earned: ((profile?.earned_badges as string[] | undefined) ?? []).includes(String(badge.name)) }))
+  const stats = [
+    { label: "Courses Enrolled", value: String(progress?.courses_enrolled ?? 0), icon: BookOpen, color: "bg-blue-50 text-blue-600 border-blue-100" },
+    { label: "Lessons Available", value: String(courses.reduce((count, course) => count + course.lessons, 0)), icon: CheckCircle2, color: "bg-emerald-50 text-emerald-600 border-emerald-100" },
+    { label: "Problems Solved", value: String(progress?.problems_solved ?? 0), icon: Code2, color: "bg-purple-50 text-purple-600 border-purple-100" },
+    { label: "Quizzes Passed", value: String(progress?.quizzes_passed ?? 0), icon: Target, color: "bg-orange-50 text-orange-600 border-orange-100" },
+    { label: "Current Streak", value: String(profile?.current_streak ?? progress?.streak ?? 0), icon: Flame, color: "bg-amber-50 text-amber-600 border-amber-100" },
+    { label: "Total Learning Time", value: `${Math.round(Number(profile?.total_learning_minutes ?? 0) / 60)} hrs`, icon: Clock, color: "bg-slate-50 text-slate-600 border-slate-200" },
+  ]
   return (
     <div className="max-w-[1440px] mx-auto px-4 lg:px-8 py-8">
       {/* Header */}

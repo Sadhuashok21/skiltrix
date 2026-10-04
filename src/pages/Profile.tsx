@@ -1,6 +1,9 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Link } from "react-router-dom"
-import { badges, courses } from "../data/mockData"
+import { useSkiltrixData } from "../context/SkiltrixDataContext"
+import { mapCourse } from "../data/apiAdapters"
+import { updateProfile } from "../api/profile"
+import { getGlobalSignInUrl } from "../api/auth"
 import { TechIcon } from "../components/TechIcons"
 import {
   CheckCircle2,
@@ -57,12 +60,57 @@ const activityFeed = [
 ]
 
 export default function Profile() {
+  const { profile, progress, discussions, enrollments, badges: apiBadges, activity, refresh } = useSkiltrixData()
+  const isSignedIn = Boolean(localStorage.getItem("user_id"))
+  const courses = enrollments.map((item) => mapCourse(item.course, item.progress_percent))
+  const earnedNames = (profile?.earned_badges as string[] | undefined) ?? []
+  const badges = apiBadges.map((badge) => ({ name: String(badge.name ?? "Badge"), icon: String(badge.icon ?? "trophy"), description: String(badge.description ?? ""), earned: earnedNames.includes(String(badge.name)) }))
+  const activityFeed = activity.map((item) => ({
+    icon: item.problems_solved ? Code2 : item.quizzes_completed ? Target : BookOpen,
+    text: `${item.problems_solved ?? 0} problems solved · ${item.quizzes_completed ?? 0} quizzes completed`,
+    time: item.date ? new Date(String(item.date)).toLocaleDateString() : "",
+    color: "bg-indigo-50 text-indigo-600",
+  }))
   const [activeTab, setActiveTab] = useState("Overview")
   const [editing, setEditing] = useState(false)
-  const [bio, setBio] = useState(
-    "Aspiring developer passionate about Python and web development. Currently preparing for tech internships. Building projects and solving DSA daily.",
-  )
-  const [name, setName] = useState("Jordan Davis")
+  const [bio, setBio] = useState("")
+  const [name, setName] = useState("")
+  const [profileError, setProfileError] = useState("")
+  const [saving, setSaving] = useState(false)
+  const userRecord = profile?.user as Record<string, unknown> | undefined
+  const initials = name.split(/\s+/).map((part) => part[0]).join("").slice(0, 2).toUpperCase() || "?"
+
+  useEffect(() => {
+    setBio(String(profile?.bio ?? ""))
+    const user = profile?.user as Record<string, unknown> | undefined
+    setName([user?.name, user?.lastname].filter(Boolean).join(" ") || String(user?.username ?? "Learner"))
+  }, [profile])
+
+  if (!isSignedIn) {
+    return (
+      <main className="min-h-[60vh] grid place-items-center px-4 py-12">
+        <section className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm">
+          <h1 className="text-2xl font-bold text-slate-900">Sign in to view your profile</h1>
+          <p className="mt-2 text-sm text-slate-600">Your profile, progress, and saved activity are available after you sign in.</p>
+          <a href={getGlobalSignInUrl()} className="mt-6 inline-flex rounded-lg bg-indigo-600 px-5 py-2.5 font-semibold text-white hover:bg-indigo-700">Sign in</a>
+        </section>
+      </main>
+    )
+  }
+
+  const toggleEditing = async () => {
+    if (!editing) { setProfileError(""); setEditing(true); return }
+    setSaving(true)
+    try {
+      await updateProfile({ bio, name })
+      setEditing(false)
+      refresh()
+    } catch (error) {
+      setProfileError(error instanceof Error ? error.message : "Profile could not be saved.")
+    } finally {
+      setSaving(false)
+    }
+  }
 
   return (
     <div className="max-w-[1440px] mx-auto px-4 lg:px-8 py-8">
@@ -74,7 +122,7 @@ export default function Profile() {
           <div className="flex flex-col sm:flex-row sm:items-end gap-4 -mt-10 mb-5">
             <div className="relative">
               <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-500 flex items-center justify-center text-white text-2xl font-extrabold border-4 border-white shadow-lg">
-                JD
+                {initials}
               </div>
               {editing && (
                 <button className="absolute bottom-0 right-0 w-6 h-6 bg-indigo-600 rounded-full flex items-center justify-center text-white text-xs border-2 border-white">
@@ -99,32 +147,33 @@ export default function Profile() {
                 </h1>
               )}
               <p className="text-slate-500 text-sm">
-                @jordandavis · Member since January 2026
+                @{String(userRecord?.username ?? "")}{profile?.created_at ? ` · Member since ${new Date(String(profile.created_at)).toLocaleDateString()}` : ""}
               </p>
             </div>
             <div className="flex gap-2 self-start sm:self-auto">
               <button
-                onClick={() => setEditing(!editing)}
+                onClick={() => void toggleEditing()}
                 className={`px-4 py-2 text-sm font-semibold rounded-xl transition-colors ${
                   editing
                     ? "bg-indigo-600 text-white"
                     : "border border-slate-200 text-slate-700 hover:border-indigo-300"
                 }`}
               >
-                {editing ? "Save Profile" : "Edit Profile"}
+                {saving ? "Saving…" : editing ? "Save Profile" : "Edit Profile"}
               </button>
+              {profileError && <p className="text-xs text-red-600">{profileError}</p>}
             </div>
           </div>
 
           {/* Stats row */}
           <div className="flex flex-wrap gap-6 mb-5">
             {[
-              { label: "Courses", value: "3", icon: BookOpen },
-              { label: "Problems Solved", value: "47", icon: Code2 },
-              { label: "Quizzes", value: "23", icon: Target },
-              { label: "Contributions", value: "15", icon: MessageSquare },
-              { label: "Streak", value: "14d", icon: Flame },
-              { label: "Level", value: "12", icon: Zap },
+              { label: "Courses", value: String(progress?.courses_enrolled ?? 0), icon: BookOpen },
+              { label: "Problems Solved", value: String(progress?.problems_solved ?? 0), icon: Code2 },
+              { label: "Quizzes", value: String(progress?.quizzes_passed ?? 0), icon: Target },
+              { label: "Discussions", value: String(discussions.length), icon: MessageSquare },
+              { label: "Streak", value: `${profile?.current_streak ?? 0}d`, icon: Flame },
+              { label: "Level", value: String(Math.floor(Number(profile?.total_xp ?? 0) / 1000) + 1), icon: Zap },
             ].map((s) => (
               <div key={s.label} className="text-center">
                 <div
