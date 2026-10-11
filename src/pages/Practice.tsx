@@ -2,7 +2,14 @@ import { useState } from "react"
 import { Link } from "react-router-dom"
 import { useSkiltrixData } from "../context/SkiltrixDataContext"
 import { mapProblem } from "../data/apiAdapters"
-import { getProblem, submitProblem, runSampleProblem, type ApiProblem, type TestCaseResult } from "../api/practice"
+import {
+  getProblem,
+  submitProblem,
+  runSampleProblem,
+  getProblemExplanation,
+  type ApiProblem,
+  type TestCaseResult,
+} from "../api/practice"
 import CodeEditor from "../components/CodeEditor"
 import CodeBlock from "../components/CodeBlock"
 import { TechIcon } from "../components/TechIcons"
@@ -14,6 +21,9 @@ import {
   Terminal,
   Loader2,
   Lock,
+  Sparkles,
+  AlertCircle,
+  BookOpen,
 } from "lucide-react"
 
 const difficultyColors: Record<string, string> = {
@@ -171,6 +181,7 @@ export default function Practice() {
   const [view, setView] = useState<"list" | "problem">("list")
   const [selectedDiff, setSelectedDiff] = useState("All")
   const [selectedTopic, setSelectedTopic] = useState("All")
+  const [selectedCategory, setSelectedCategory] = useState("All")
   const [practiceLang, setPracticeLang] = useState<PracticeLangKey>("python")
   const [code, setCode] = useState("")
   const [output, setOutput] = useState("")
@@ -178,16 +189,22 @@ export default function Practice() {
   const [submitted, setSubmitted] = useState(false)
   const [testResults, setTestResults] = useState<TestCaseResult[]>([])
   const [overallVerdict, setOverallVerdict] = useState<string | null>(null)
+  const [performanceStatus, setPerformanceStatus] = useState<string | null>(null)
+  const [solutionExplanation, setSolutionExplanation] = useState<{ explanation?: string; solution_code?: string } | null>(null)
   const [activeTestTab, setActiveTestTab] = useState(0)
   const [testDuration, setTestDuration] = useState<number>(0)
   const [activeTab, setActiveTab] = useState("Description")
   const [activeProblem, setActiveProblem] = useState<ApiProblem | null>(null)
 
-  const filtered = codingProblems.filter((p) => {
+  const filtered = codingProblems.filter((p: any) => {
     const matchDiff = selectedDiff === "All" || p.difficulty === selectedDiff
-    const matchTopic =
-      selectedTopic === "All" || p.topics.includes(selectedTopic)
-    return matchDiff && matchTopic
+    const matchTopic = selectedTopic === "All" || p.topics.includes(selectedTopic)
+    const matchCat =
+      selectedCategory === "All" ||
+      (selectedCategory === "Backend Debugging" && (p.question_type === "debugging" || p.category === "Backend Debugging")) ||
+      (selectedCategory === "DSA" && (p.question_type === "algorithmic" || p.category !== "Backend Debugging")) ||
+      p.category === selectedCategory
+    return matchDiff && matchTopic && matchCat
   })
 
   const stats = {
@@ -212,6 +229,11 @@ export default function Practice() {
     setActiveProblem(null)
     setView("problem")
     setActiveTab("Description")
+    setSolutionExplanation(null)
+    setPerformanceStatus(null)
+    setOverallVerdict(null)
+    setTestResults([])
+    setOutput("")
     try {
       const problem = await getProblem(String(problemId))
       setActiveProblem(problem)
@@ -261,6 +283,13 @@ export default function Practice() {
       const result = res.result
       setSubmitted(result?.verdict === "Accepted")
       setOverallVerdict(result?.verdict || "Evaluated")
+      setPerformanceStatus(result?.performance_status || null)
+      if (result?.explanation || result?.solution_code) {
+        setSolutionExplanation({
+          explanation: result.explanation,
+          solution_code: result.solution_code,
+        })
+      }
       setTestResults(result?.test_results || [])
       setTestDuration(result?.duration_ms || 0)
       setActiveTestTab(0)
@@ -272,6 +301,19 @@ export default function Practice() {
     }
   }
 
+  const handleTabChange = async (tab: string) => {
+    setActiveTab(tab)
+    if (tab === "Solutions" && activeProblem && !solutionExplanation) {
+      try {
+        const data = await getProblemExplanation(activeProblem.problem_id)
+        if (data?.explanation || data?.solution_code) {
+          setSolutionExplanation(data)
+        }
+      } catch {
+        // Locked until submitted or attempted
+      }
+    }
+  }
 
   const currentLangObj =
     PRACTICE_LANGUAGES.find((l) => l.id === practiceLang) ||
@@ -293,7 +335,7 @@ export default function Practice() {
             {["Description", "Hints", "Solutions"].map((t) => (
               <button
                 key={t}
-                onClick={() => setActiveTab(t)}
+                onClick={() => void handleTabChange(t)}
                 className={`px-3 py-1 rounded-md text-xs font-semibold transition-colors ${
                   activeTab === t
                     ? "bg-white shadow-sm text-slate-900"
@@ -351,11 +393,15 @@ export default function Practice() {
                 </p>
                 <div className="grid grid-cols-2 gap-3 mb-5">
                   {[
-                    { label: "Runtime", value: "38ms", sub: "Faster than 89%" },
                     {
-                      label: "Memory",
-                      value: "14.1 MB",
-                      sub: "Better than 76%",
+                      label: "Runtime",
+                      value: `${testDuration || 45}ms`,
+                      sub: performanceStatus || "Optimal",
+                    },
+                    {
+                      label: "Complexity",
+                      value: activeProblem?.expected_complexity || "O(N) Time",
+                      sub: "Verified",
                     },
                     {
                       label: "Language",
@@ -407,6 +453,11 @@ export default function Practice() {
                       <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-green-100 text-green-700">
                         {activeProblem?.difficulty || "—"}
                       </span>
+                      {activeProblem?.category && (
+                        <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700">
+                          {activeProblem.category}
+                        </span>
+                      )}
                       <span className="text-xs text-slate-400">
                         Acceptance: {activeProblem?.acceptance_rate ?? 0}%
                       </span>
@@ -419,6 +470,39 @@ export default function Practice() {
                     <div className="text-sm text-slate-700 leading-relaxed space-y-3">
                       <p>{activeProblem?.description || "No problem description is available."}</p>
                     </div>
+
+                    {/* Backend Debugging Diagnostic Callout */}
+                    {activeProblem?.error_snippet && (
+                      <div className="bg-red-950/10 border border-red-200 rounded-lg p-3 space-y-1.5">
+                        <div className="flex items-center gap-1.5 text-xs font-bold text-red-700">
+                          <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
+                          <span>Diagnostic Error Traceback</span>
+                        </div>
+                        <pre className="text-xs font-mono bg-slate-900 text-red-300 p-2.5 rounded overflow-x-auto whitespace-pre-wrap">
+                          {activeProblem.error_snippet}
+                        </pre>
+                      </div>
+                    )}
+
+                    {activeProblem?.expected_behavior && (
+                      <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3 space-y-1">
+                        <div className="text-xs font-bold text-emerald-800">
+                          Expected Correct Behavior:
+                        </div>
+                        <p className="text-xs text-slate-700">
+                          {activeProblem.expected_behavior}
+                        </p>
+                      </div>
+                    )}
+
+                    {activeProblem?.expected_complexity && (
+                      <div className="bg-indigo-50/70 border border-indigo-100 rounded-lg p-2.5 text-xs text-indigo-950 flex items-center justify-between">
+                        <span className="font-semibold text-indigo-800">Target Complexity:</span>
+                        <code className="bg-white px-2 py-0.5 rounded border border-indigo-200 text-indigo-700 font-mono font-medium">
+                          {activeProblem.expected_complexity}
+                        </code>
+                      </div>
+                    )}
 
                     <div className="space-y-3">
                       {(activeProblem?.sample_test_cases || []).map((testCase: any, i) => (
@@ -447,11 +531,20 @@ export default function Practice() {
                       <h4 className="text-sm font-semibold text-slate-900 mb-2">
                         Constraints:
                       </h4>
-                      <ul className="text-xs text-slate-600 space-y-1 font-mono">{(activeProblem?.constraints || "No constraints provided.").split("\n").map((constraint, index) => <li key={index}>{constraint}</li>)}</ul>
+                      <ul className="text-xs text-slate-600 space-y-1 font-mono">
+                        {(activeProblem?.constraints || "No constraints provided.")
+                          .split("\n")
+                          .map((constraint, index) => (
+                            <li key={index}>{constraint}</li>
+                          ))}
+                      </ul>
                     </div>
 
                     <div className="flex flex-wrap gap-2 pt-2">
-                      {(Array.isArray(activeProblem?.topics) ? activeProblem.topics : String(activeProblem?.topics ?? "").split(",")).map((tag) => (
+                      {(Array.isArray(activeProblem?.topics)
+                        ? activeProblem.topics
+                        : String(activeProblem?.topics ?? "").split(",")
+                      ).map((tag) => (
                         <span
                           key={tag}
                           className="text-xs bg-indigo-50 text-indigo-600 px-2.5 py-1 rounded-lg font-medium"
@@ -465,13 +558,7 @@ export default function Practice() {
 
                 {activeTab === "Hints" && (
                   <div className="space-y-3">
-                    {(activeProblem?.hints ?? []).map((hint, i) => <div key={i} className="bg-amber-50 border border-amber-200 rounded-lg p-3"><p className="text-xs font-semibold text-amber-700 mb-1">Hint {i + 1}</p><p className="text-sm text-slate-700">{hint}</p></div>)}
-                    {!activeProblem?.hints?.length && <p className="text-sm text-slate-500">No hints are available.</p>}
-                    {false && [
-                      "A brute-force solution is O(n²) — check every pair. Can you do better?",
-                      "For each number, what other number would complete the pair? (complement = target - num)",
-                      "A hash map / dictionary can tell you if a complement already exists in O(1) time.",
-                    ].map((hint, i) => (
+                    {(activeProblem?.hints ?? []).map((hint, i) => (
                       <div
                         key={i}
                         className="bg-amber-50 border border-amber-200 rounded-lg p-3"
@@ -482,20 +569,58 @@ export default function Practice() {
                         <p className="text-sm text-slate-700">{hint}</p>
                       </div>
                     ))}
+                    {!activeProblem?.hints?.length && (
+                      <p className="text-sm text-slate-500">No hints are available.</p>
+                    )}
                   </div>
                 )}
 
                 {activeTab === "Solutions" && (
                   <div className="space-y-4">
-                    <p className="text-xs text-slate-600 leading-relaxed">Code sample supplied for {currentLangObj.label} by the problem record.</p>
-                    <CodeBlock
-                      code={activeProblem?.starter_codes?.[practiceLang] ?? ""}
-                      language={practiceLang}
-                      filename={`solution.${currentLangObj.ext}`}
-                      showLineNumbers={true}
-                      maxHeight="320px"
-                    />
-                    
+                    {solutionExplanation?.explanation ? (
+                      <div className="space-y-4">
+                        <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3 text-xs text-emerald-800 flex items-center gap-2">
+                          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                          <span>Official Solution & Editorial Unlocked</span>
+                        </div>
+                        <div>
+                          <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wide mb-1.5">
+                            Approach & Editorial
+                          </h4>
+                          <div className="text-xs text-slate-700 whitespace-pre-wrap bg-slate-50 p-3 rounded-lg border border-slate-200 leading-relaxed font-sans">
+                            {solutionExplanation.explanation}
+                          </div>
+                        </div>
+                        {solutionExplanation.solution_code && (
+                          <div>
+                            <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wide mb-1.5">
+                              Reference Implementation
+                            </h4>
+                            <CodeBlock
+                              code={solutionExplanation.solution_code}
+                              language={practiceLang}
+                              filename={`solution_optimal.${currentLangObj.ext}`}
+                              showLineNumbers={true}
+                              maxHeight="320px"
+                            />
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="bg-slate-50 border border-slate-200 rounded-xl p-5 text-center space-y-3">
+                        <div className="w-10 h-10 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center mx-auto">
+                          <Lock className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <h4 className="text-sm font-bold text-slate-900">
+                            Editorial Locked
+                          </h4>
+                          <p className="text-xs text-slate-500 mt-1 max-w-xs mx-auto">
+                            Submit your code or complete an assessment attempt to unlock the full official approach, complexity breakdown, and reference solution.
+                          </p>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </>
@@ -726,7 +851,7 @@ export default function Practice() {
           </p>
         </div>
         <Link
-          to="/compiler"
+          to="/compilers"
           className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-4 py-2.5 rounded-xl text-sm transition-colors shadow-sm"
         >
           <Terminal className="w-4 h-4" />
@@ -779,10 +904,57 @@ export default function Practice() {
         ))}
       </div>
 
+      {/* SDE Technical Assessment Simulator Banner */}
+      <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white rounded-2xl p-6 mb-8 border border-indigo-800/40 shadow-lg flex flex-col md:flex-row items-start md:items-center justify-between gap-5">
+        <div>
+          <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 mb-2">
+            <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+            <span>Company Assessment Simulator</span>
+          </div>
+          <h3 className="text-xl font-bold tracking-tight">
+            Amazon-Style SDE Technical Assessments & Backend Debugging
+          </h3>
+          <p className="text-sm text-slate-300 max-w-2xl mt-1">
+            Simulate realistic timed coding rounds with hidden test cases, edge case verification, Django backend debugging, and final Amazon-style skill scorecards.
+          </p>
+        </div>
+        <div className="flex items-center gap-2.5 shrink-0 flex-wrap">
+          <Link
+            to="/placement-preparation"
+            className="px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs sm:text-sm transition-all shadow-md hover:shadow-indigo-500/20 whitespace-nowrap"
+          >
+            Placement Prep (11 Mocks) →
+          </Link>
+          <Link
+            to="/codelab/assessment/asmt_amazon_sde1"
+            className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs sm:text-sm transition-all border border-slate-700 whitespace-nowrap"
+          >
+            Amazon-Style Mock
+          </Link>
+        </div>
+      </div>
+
       {/* Filter Toolbar */}
       <div className="bg-white rounded-xl border border-slate-200 p-4 mb-6 flex flex-col md:flex-row gap-4 items-start md:items-center justify-between shadow-sm">
         <div className="flex items-center gap-2 flex-wrap">
           <span className="text-xs font-semibold text-slate-500 mr-1">
+            Category:
+          </span>
+          {["All", "DSA", "Backend Debugging"].map((c) => (
+            <button
+              key={c}
+              onClick={() => setSelectedCategory(c)}
+              className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
+                selectedCategory === c
+                  ? "bg-slate-900 text-white font-semibold shadow-sm"
+                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+              }`}
+            >
+              {c}
+            </button>
+          ))}
+
+          <span className="text-xs font-semibold text-slate-500 ml-2 mr-1">
             Difficulty:
           </span>
           {["All", "Easy", "Medium", "Hard"].map((d) => (
@@ -791,7 +963,7 @@ export default function Practice() {
               onClick={() => setSelectedDiff(d)}
               className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
                 selectedDiff === d
-                  ? "bg-indigo-600 text-white font-semibold"
+                  ? "bg-indigo-600 text-white font-semibold shadow-sm"
                   : "bg-slate-100 text-slate-600 hover:bg-slate-200"
               }`}
             >

@@ -1,13 +1,14 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react'
 import type { AuthUser, AuthContextType, ClientAuthConfig } from './types'
-import { initiateLogin } from './pkce'
+import { initiateLogin, resolveAccountsUrl } from './pkce'
+import { API_ORIGIN } from '../api/client'
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 const DEFAULT_CONFIG: ClientAuthConfig = {
   clientId: 'skiltrix',
-  accountsPortalUrl: (import.meta.env.VITE_ACCOUNTS_URL || 'http://localhost:5174').replace(/\/+$/, ''),
-  apiBaseUrl: (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000').replace(/\/+$/, ''),
+  accountsPortalUrl: resolveAccountsUrl(import.meta.env.VITE_ACCOUNTS_URL),
+  apiBaseUrl: API_ORIGIN,
   redirectUri: typeof window !== 'undefined'
     ? `${window.location.origin}/auth/callback`
     : 'http://localhost:8443/auth/callback',

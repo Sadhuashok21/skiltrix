@@ -2,6 +2,7 @@ import { useState } from "react"
 import { Link } from "react-router-dom"
 import { useSkiltrixData } from "../context/SkiltrixDataContext"
 import { mapCourse } from "../data/apiAdapters"
+import { getStImageUrl } from "../utils/cdn"
 import { TechIcon } from "../components/TechIcons"
 
 const difficulties = ["All", "Beginner", "Intermediate", "Advanced"]
@@ -209,7 +210,7 @@ export default function Courses() {
             >
               <div className="relative h-40 overflow-hidden bg-slate-100">
                 {course.image ? <img
-                  src={course.image}
+                  src={getStImageUrl(course.image)}
                   alt={course.title}
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                 /> : <div className="w-full h-full flex items-center justify-center"><TechIcon name={course.icon || course.technology} className="w-16 h-16 text-indigo-500" /></div>}
@@ -235,9 +236,14 @@ export default function Courses() {
                 </div>
               </div>
               <div className="p-5">
-                <span className="text-xs font-semibold text-indigo-600 uppercase tracking-wide">
-                  {course.technology}
-                </span>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-xs font-semibold text-indigo-600 uppercase tracking-wide">
+                    {course.technology}
+                  </span>
+                  <span className={`text-xs font-bold px-2 py-0.5 rounded ${(course.price || 0) > 0 ? "bg-amber-50 text-amber-800 border border-amber-200/60" : "bg-emerald-50 text-emerald-800 border border-emerald-200/60"}`}>
+                    {(course.price || 0) > 0 ? `₹${(course.price || 0).toLocaleString("en-IN")}` : "Free"}
+                  </span>
+                </div>
                 <h3
                   className="font-bold text-slate-900 mt-1 mb-2 group-hover:text-indigo-600 transition-colors leading-snug"
                   style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}
@@ -304,9 +310,13 @@ export default function Courses() {
                       Continue →
                     </button>
                   </div>
+                ) : (course.price || 0) > 0 ? (
+                  <button className="w-full bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold py-2 rounded-lg transition-colors shadow-sm">
+                    Enroll Now &bull; ₹{(course.price || 0).toLocaleString("en-IN")}
+                  </button>
                 ) : (
                   <button className="w-full bg-slate-900 hover:bg-indigo-600 text-white text-sm font-semibold py-2 rounded-lg transition-colors">
-                    Start Course
+                    Start Free Course
                   </button>
                 )}
               </div>

@@ -297,7 +297,7 @@ export const registerABAPLanguage = (monaco: Monaco) => {
 
   // 3. Code Folding Provider (Block Folding for IF, LOOP, CLASS, METHOD, etc.)
   monaco.languages.registerFoldingRangeProvider("abap", {
-    provideFoldingRanges: (model) => {
+    provideFoldingRanges: (model: any) => {
       const ranges: Array<{ start: number; end: number; kind: any }> = []
       const stack: Array<{ type: string; line: number }> = []
       const totalLines = model.getLineCount()
@@ -355,7 +355,7 @@ export const registerABAPLanguage = (monaco: Monaco) => {
 
   // 4. Completion Item Provider (IntelliSense & Snippets)
   monaco.languages.registerCompletionItemProvider("abap", {
-    provideCompletionItems: (model, position) => {
+    provideCompletionItems: (model: any, position: any) => {
       const word = model.getWordUntilPosition(position)
       const range = {
         startLineNumber: position.lineNumber,
@@ -547,7 +547,7 @@ export const registerABAPLanguage = (monaco: Monaco) => {
 
   // 5. Hover Documentation Provider
   monaco.languages.registerHoverProvider("abap", {
-    provideHover: (model, position) => {
+    provideHover: (model: any, position: any) => {
       const word = model.getWordAtPosition(position)
       if (!word) return null
 
@@ -567,7 +567,7 @@ export const registerABAPLanguage = (monaco: Monaco) => {
 
   // 6. Document Formatting Edit Provider (Shift+Alt+F)
   monaco.languages.registerDocumentFormattingEditProvider("abap", {
-    provideDocumentFormattingEdits: (model) => {
+    provideDocumentFormattingEdits: (model: any) => {
       const originalCode = model.getValue()
       const formattedCode = formatABAPCode(originalCode)
       const lineCount = model.getLineCount()

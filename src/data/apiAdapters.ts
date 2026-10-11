@@ -3,8 +3,12 @@ import type { ApiProblem } from "../api/practice"
 import type { ApiQuiz } from "../api/quizzes"
 import type { ApiDiscussion } from "../api/community"
 import type { courses as exampleCourses, codingProblems as exampleProblems, quizTopics as exampleQuizzes, discussions as exampleDiscussions } from "./mockData"
+import { getStImageUrl } from "../utils/cdn"
 
-export type CourseCardData = typeof exampleCourses[number]
+export type CourseCardData = typeof exampleCourses[number] & {
+  price?: number
+  is_paid?: boolean
+}
 export type ProblemCardData = typeof exampleProblems[number]
 export type QuizCardData = typeof exampleQuizzes[number]
 export type DiscussionCardData = typeof exampleDiscussions[number]
@@ -32,12 +36,14 @@ export function mapCourse(course: ApiCourse, progress = 0): CourseCardData {
     students: 1250,
     progress,
     color: "from-indigo-400 to-violet-400",
-    image: course?.image || "",
+    image: (course as any)?.image_url || getStImageUrl(course?.image),
     topics: topics.length > 0 ? topics : ["Fundamentals", "Practice", "Project"],
+    price: typeof course?.price === "number" ? course.price : 0,
+    is_paid: Boolean(course?.is_paid),
   }
 }
 
-export function mapProblem(problem: ApiProblem): ProblemCardData {
+export function mapProblem(problem: ApiProblem): ProblemCardData & { category?: string; question_type?: string } {
   const diffStr = problem?.difficulty ? String(problem.difficulty) : "Easy"
   const difficulty = diffStr.toLowerCase() === "medium" ? "Medium" : (diffStr[0]?.toUpperCase() + diffStr.slice(1)) || "Easy"
   const topics = Array.isArray(problem?.topics) ? problem.topics : String(problem?.topics ?? "").split(",").map((topic) => topic.trim()).filter(Boolean)
@@ -46,6 +52,8 @@ export function mapProblem(problem: ApiProblem): ProblemCardData {
     title: problem?.title || "Problem",
     difficulty,
     topics: topics.length > 0 ? topics : ["Algorithms"],
+    category: problem?.category || "DSA",
+    question_type: problem?.question_type || "algorithmic",
     solved: Boolean(problem?.is_solved),
     attempts: problem?.total_attempts || 0,
     acceptance: `${problem?.acceptance_rate ?? 75}%`,

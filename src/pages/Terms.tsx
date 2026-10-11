@@ -4,19 +4,19 @@ export default function Terms() {
       id: "acceptance",
       title: "1. Acceptance of Terms",
       content:
-        "By accessing or using SkillTrix, you agree to be bound by these Terms of Service. If you do not agree, please do not use the platform. We reserve the right to update these terms at any time with notice.",
+        "By accessing or using SkilTrix, you agree to be bound by these Terms of Service. If you do not agree, please do not use the platform. We reserve the right to update these terms at any time with notice.",
     },
     {
       id: "use",
       title: "2. Acceptable Use",
       content:
-        "You agree to use SkillTrix for lawful educational purposes only. You may not share your account, post harmful content, plagiarize solutions, or attempt to disrupt the platform or other users' experience.",
+        "You agree to use SkilTrix for lawful educational purposes only. You may not share your account, post harmful content, plagiarize solutions, or attempt to disrupt the platform or other users' experience.",
     },
     {
       id: "content",
       title: "3. Educational Content",
       content:
-        "All course content, coding problems, quizzes, and resources on SkillTrix are for personal educational use only. Reproduction or commercial redistribution of content is prohibited without prior written consent.",
+        "All course content, coding problems, quizzes, and resources on SkilTrix are for personal educational use only. Reproduction or commercial redistribution of content is prohibited without prior written consent.",
     },
     {
       id: "community",
@@ -28,13 +28,13 @@ export default function Terms() {
       id: "ip",
       title: "5. Intellectual Property",
       content:
-        "SkillTrix and its content are protected by copyright. Your original code submissions remain your intellectual property. By posting in discussions, you grant SkillTrix a non-exclusive license to display that content.",
+        "SkilTrix and its content are protected by copyright. Your original code submissions remain your intellectual property. By posting in discussions, you grant SkilTrix a non-exclusive license to display that content.",
     },
     {
       id: "accounts",
       title: "6. Accounts & Security",
       content:
-        "You are responsible for maintaining the security of your account and password. Notify us immediately of any unauthorized use. SkillTrix is not liable for losses resulting from your failure to secure your credentials.",
+        "You are responsible for maintaining the security of your account and password. Notify us immediately of any unauthorized use. SkilTrix is not liable for losses resulting from your failure to secure your credentials.",
     },
     {
       id: "termination",
@@ -46,7 +46,7 @@ export default function Terms() {
       id: "liability",
       title: "8. Limitation of Liability",
       content:
-        "SkillTrix is provided 'as is' without warranties. We are not liable for indirect or consequential damages resulting from your use of the platform. Our liability is limited to the amount paid in the preceding 12 months.",
+        "SkilTrix is provided 'as is' without warranties. We are not liable for indirect or consequential damages resulting from your use of the platform. Our liability is limited to the amount paid in the preceding 12 months.",
     },
   ]
 
@@ -60,14 +60,14 @@ export default function Terms() {
           Terms of Service
         </h1>
         <p className="text-slate-500 text-sm">
-          Last updated: September 1, 2026
+          Last updated: October 2026
         </p>
       </div>
 
       <div className="grid lg:grid-cols-4 gap-8">
         {/* TOC */}
         <div className="hidden lg:block">
-          <div className="sticky top-24 bg-white rounded-xl border border-slate-200 p-4">
+          <div className="sticky top-24 bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
             <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">
               Contents
             </h3>
@@ -76,7 +76,7 @@ export default function Terms() {
                 <a
                   key={s.id}
                   href={`#${s.id}`}
-                  className="block text-xs text-slate-600 hover:text-indigo-600 py-1"
+                  className="block text-xs text-slate-600 hover:text-indigo-600 py-1 transition-colors"
                 >
                   {s.title}
                 </a>
@@ -89,7 +89,7 @@ export default function Terms() {
         <div className="lg:col-span-3 space-y-8">
           <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
             <p className="text-sm text-amber-800">
-              Please read these terms carefully before using SkillTrix. By using
+              Please read these terms carefully before using SkilTrix. By using
               our platform, you agree to these terms.
             </p>
           </div>
@@ -97,7 +97,7 @@ export default function Terms() {
             <div
               key={s.id}
               id={s.id}
-              className="bg-white rounded-xl border border-slate-200 p-6"
+              className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm scroll-mt-24"
             >
               <h2
                 className="text-lg font-bold text-slate-900 mb-3"
@@ -111,7 +111,7 @@ export default function Terms() {
             </div>
           ))}
           <p className="text-xs text-slate-400">
-            Questions about our terms? Contact us at legal@skilltrix.com
+            Questions about our terms? Contact us at legal@skiltrix.com
           </p>
         </div>
       </div>

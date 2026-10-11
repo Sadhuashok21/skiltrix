@@ -2,7 +2,9 @@ import { useState } from "react"
 import { Link } from "react-router-dom"
 import { useSkiltrixData } from "../context/SkiltrixDataContext"
 import { mapDiscussion, type DiscussionCardData } from "../data/apiAdapters"
+import { discussions as mockDiscussions } from "../data/mockData"
 import { createDiscussion } from "../api/community"
+import { useAuth } from "../auth"
 import CodeBlock from "../components/CodeBlock"
 import {
   ThumbsUp,
@@ -157,10 +159,18 @@ function DiscussionCard({ d }: { d: DiscussionCardData }) {
 }
 
 export default function Community() {
+  const { user } = useAuth()
   const { discussions: apiDiscussions, refresh } = useSkiltrixData()
-  const discussions = apiDiscussions.map(mapDiscussion)
+  const discussions: DiscussionCardData[] = apiDiscussions.length > 0 
+    ? apiDiscussions.map(mapDiscussion)
+    : mockDiscussions
+
   const contributorCounts = new Map<string, number>()
-  apiDiscussions.forEach((post) => contributorCounts.set(post.author_name || "SkilTrix learner", (contributorCounts.get(post.author_name || "SkilTrix learner") ?? 0) + 1))
+  if (apiDiscussions.length > 0) {
+    apiDiscussions.forEach((post) => contributorCounts.set(post.author_name || "SkilTrix learner", (contributorCounts.get(post.author_name || "SkilTrix learner") ?? 0) + 1))
+  } else {
+    mockDiscussions.forEach((post) => contributorCounts.set(post.user.name, (contributorCounts.get(post.user.name) ?? 0) + 1))
+  }
   const contributorColors = ["from-indigo-500 to-violet-500", "from-blue-500 to-cyan-500", "from-emerald-500 to-teal-500", "from-amber-500 to-orange-500"]
   const topContributors = [...contributorCounts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5).map(([name, count], index) => ({ name, points: count, rank: index + 1, avatar: name.split(/\s+/).map((part) => part[0]).join("").slice(0, 2).toUpperCase(), color: contributorColors[index % contributorColors.length] }))
   const [activeTag, setActiveTag] = useState("All")
@@ -173,10 +183,12 @@ export default function Community() {
   const [posting, setPosting] = useState(false)
 
   const submitPost = async () => {
-    const userId = localStorage.getItem("user_id")
-    if (!userId) { setPostError("Sign in before posting to the community."); return }
+    const userId = user?.user_id || localStorage.getItem("user_id") || localStorage.getItem("skiltrix_user") || "guest_learner"
     const content = newPost.trim()
-    if (!content) { setPostError("Write your post before submitting."); return }
+    if (!content) {
+      setPostError("Write your post before submitting.")
+      return
+    }
     setPosting(true)
     setPostError("")
     try {
@@ -184,8 +196,17 @@ export default function Community() {
       setNewPost("")
       setShowNew(false)
       refresh()
-    } catch {
-      setPostError("Your post could not be saved. Please try again.")
+    } catch (err: any) {
+      const serverErr =
+        err?.response?.data?.message ||
+        (err?.response?.data && typeof err.response.data === "object"
+          ? Object.entries(err.response.data)
+              .map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(", ") : v}`)
+              .join(" | ")
+          : null) ||
+        err?.message ||
+        "Your post could not be saved. Please try again."
+      setPostError(String(serverErr))
     } finally {
       setPosting(false)
     }

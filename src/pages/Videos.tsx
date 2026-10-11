@@ -2,6 +2,7 @@ import { useState, useEffect } from "react"
 import { getVideos } from "../api/videos"
 import type { ApiVideo } from "../api/videos"
 import InVideo, { Video } from "./InVideo"
+import { getStImageUrl, getStVideoUrl } from "../utils/cdn"
 
 export default function Videos() {
   const [activeTag, setActiveTag] = useState("All")
@@ -218,8 +219,6 @@ export default function Videos() {
 }
 
 function mapVideo(record: ApiVideo): Video {
-  const mediaBase = import.meta.env.VITE_MEDIA_BASE_URL || "http://127.0.0.1:8000/media"
-  const mediaUrl = (value: string) => /^https?:\/\//i.test(value) ? value : `${mediaBase.replace(/\/$/, "")}/${value.replace(/^\//, "")}`
   return {
     id: record.video_id,
     title: record.title,
@@ -228,8 +227,8 @@ function mapVideo(record: ApiVideo): Video {
     views: String(record.views ?? 0),
     likes: String(record.like ?? 0),
     tag: record.course_name || "Lessons",
-    thumb: mediaUrl(record.image),
+    thumb: getStImageUrl(record.image),
     date: record.created_at ? new Date(record.created_at).toLocaleDateString() : "",
-    videoUrl: mediaUrl(record.video),
+    videoUrl: getStVideoUrl(record.video),
   }
 }

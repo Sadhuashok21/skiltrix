@@ -16,6 +16,8 @@ import {
   ArrowRight,
   Loader2,
   Terminal,
+  Trophy,
+  Target,
 } from "lucide-react"
 
 import {
@@ -25,6 +27,7 @@ import {
   exportProjectZipUrl,
   type ApiProject,
 } from "../api/codelab"
+import { getAssessments, type ApiAssessment } from "../api/practice"
 import { TechIcon } from "../components/TechIcons"
 
 const PROJECT_TEMPLATES = [
@@ -105,6 +108,7 @@ const PROJECT_TEMPLATES = [
 export default function CodeLabDashboard() {
   const navigate = useNavigate()
   const [projects, setProjects] = useState<ApiProject[]>([])
+  const [assessments, setAssessments] = useState<ApiAssessment[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState("")
   const [filterType, setFilterType] = useState<string>("all")
@@ -118,8 +122,12 @@ export default function CodeLabDashboard() {
   const loadProjects = async () => {
     try {
       setLoading(true)
-      const data = await listProjects()
-      setProjects(data)
+      const [projData, asmtData] = await Promise.all([
+        listProjects(),
+        getAssessments().catch(() => []),
+      ])
+      setProjects(projData)
+      setAssessments(asmtData)
     } catch (err: any) {
       console.error("Failed to load projects", err)
     } finally {
@@ -218,6 +226,51 @@ export default function CodeLabDashboard() {
             </button>
           </div>
         </div>
+
+        {/* Assessments Hero Section */}
+        {assessments.length > 0 && (
+          <div className="mt-8 bg-gradient-to-r from-indigo-950/60 via-slate-900 to-slate-900 border border-indigo-500/30 rounded-2xl p-6 sm:p-7 shadow-xl relative overflow-hidden">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+              <div className="max-w-2xl">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20 uppercase tracking-wider">
+                    <Trophy className="w-3.5 h-3.5" /> Company Technical Evaluation
+                  </span>
+                  <span className="text-xs text-slate-400">Amazon SDE Difficulty</span>
+                </div>
+                <h2 className="text-xl sm:text-2xl font-bold text-white mb-2">
+                  SDE Technical Assessments & Backend Debugging
+                </h2>
+                <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+                  Experience timed, proctored coding assessments with hidden test evaluation, server countdown timers,
+                  Django ORM performance tuning, and Amazon-style skill radar scorecards.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-3 shrink-0">
+                <Link
+                  to="/placement-preparation"
+                  className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs px-4 py-2.5 rounded-xl transition-all shadow-md shadow-indigo-600/30 group"
+                >
+                  <Trophy className="w-4 h-4 text-amber-300" />
+                  <span>Explore 11 Company Mocks</span>
+                  <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
+                </Link>
+                {assessments.slice(0, 3).map((asmt) => (
+                  <Link
+                    key={asmt.assessment_id}
+                    to={`/codelab/assessment/${asmt.assessment_id}`}
+                    className="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs px-3.5 py-2.5 rounded-xl border border-slate-700 hover:border-slate-600 transition-all shadow-md group"
+                  >
+                    <span>{asmt.title.replace("Technical Coding Assessment", "").trim()}</span>
+                    <span className="text-[10px] text-indigo-300 font-mono">({asmt.duration_minutes}m)</span>
+                    <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
+                  </Link>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Filters and Search Bar */}
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-8">

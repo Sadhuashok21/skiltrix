@@ -77,6 +77,8 @@ export interface ABAPExecutionResult {
   diagnostics: Array<{
     line?: number
     column?: number
+    endLine?: number
+    endColumn?: number
     code?: string
     severity: "error" | "warning" | "info"
     message: string
@@ -84,6 +86,7 @@ export interface ABAPExecutionResult {
   execution_mode: "simulator" | "sap_connected"
   internal_tables_state?: Record<string, any[]>
   database_tables_state?: Record<string, any[]>
+  system_fields?: Record<string, any>
 }
 
 export const listABAPProjects = async (mode?: string): Promise<ApiABAPProject[]> => {
@@ -286,6 +289,8 @@ export const checkABAPSyntax = async (payload: {
   diagnostics: Array<{
     line?: number
     column?: number
+    endLine?: number
+    endColumn?: number
     code?: string
     severity: "error" | "warning" | "info"
     message: string
@@ -317,6 +322,7 @@ export interface ApiABAPDictionaryTable {
   table_name: string
   description: string
   delivery_class: string
+  client_dependent?: boolean
   fields_schema: Array<{
     field: string
     key: boolean
@@ -342,6 +348,7 @@ export const createABAPDictionaryTable = async (payload: {
   table_name: string
   description?: string
   delivery_class?: string
+  client_dependent?: boolean
   fields_schema: Array<{
     field: string
     key: boolean

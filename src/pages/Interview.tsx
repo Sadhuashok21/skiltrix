@@ -158,7 +158,7 @@ export default function Interview() {
                 Practice This
               </h3>
               <Link
-                to="/compiler"
+                to="/compilers"
                 className="flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold py-2.5 rounded-lg transition-colors mb-2"
               >
                 <Terminal className="w-4 h-4" />

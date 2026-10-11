@@ -152,7 +152,7 @@ export default function ABAPStudio() {
     window.addEventListener("mouseup", onMouseUp)
   }, [sidebarWidth])
 
-  const [bottomPanelTab, setBottomPanelTab] = useState<"console" | "problems" | "preview" | "tables">("console")
+  const [bottomPanelTab, setBottomPanelTab] = useState<"console" | "problems" | "diagnostics" | "preview" | "tables">("console")
   const [bottomPanelOpen, setBottomPanelOpen] = useState(true)
   const [bottomPanelHeight, setBottomPanelHeight] = useState(240)
   const [theme, setTheme] = useState<"sap-fiori-dark" | "vs-dark" | "light">("sap-fiori-dark")
@@ -1829,10 +1829,12 @@ START-OF-SELECTION.
                   </div>
 
                   {diagnostics.filter((item) => diagnosticFilter === "all" || item.severity === diagnosticFilter).length === 0 ? (
-                    <div className="text-slate-400 italic py-6 text-center">
-                      ✓ No {diagnosticFilter === "all" ? "syntax errors or warnings" : `${diagnosticFilter}s`} found. Active code is clean!
+                    <div className="text-slate-400 italic py-6 text-center flex items-center justify-center gap-1.5">
+                      <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" />
+                      <span>No {diagnosticFilter === "all" ? "syntax errors or warnings" : `${diagnosticFilter}s`} found. Active code is clean!</span>
                     </div>
                   ) : (
+
                     <div className="space-y-1.5">
                       {diagnostics
                         .filter((item) => diagnosticFilter === "all" || item.severity === diagnosticFilter)

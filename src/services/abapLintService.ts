@@ -14,7 +14,7 @@ export interface ABAPDiagnosticItem {
   severity: "error" | "warning" | "info"
   message: string
   code: string
-  category: "syntax" | "lint" | "spacing" | "ddic" | "style"
+  category: "syntax" | "lint" | "spacing" | "ddic" | "style" | "runtime" | "simulator compatibility"
   source: string
   quickFix?: {
     description: string

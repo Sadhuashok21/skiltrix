@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom"
 import VideoPlayer, { SubtitleItem, ChapterItem } from "../components/VideoPlayer"
 import CodeBlock from "../components/CodeBlock"
 import { TechIcon } from "../components/TechIcons"
+import { getStImageUrl, getStVideoUrl } from "../utils/cdn"
 import {
   ThumbsUp,
   ThumbsDown,
@@ -289,7 +290,8 @@ export default function InVideo({
       localStorage.setItem("skiltrix_custom_code", codeSnippet)
       localStorage.setItem("skiltrix_custom_lang", lang || "python")
     }
-    navigate("/compiler")
+    const cleanLang = (lang || "python").toLowerCase().trim()
+    navigate(`/compilers/${cleanLang}-compiler`)
   }
 
   return (
@@ -321,8 +323,8 @@ export default function InVideo({
           </div>
           <div className="aspect-video w-full">
             <VideoPlayer
-              videoUrl={activeVideo.videoUrl}
-              poster={activeVideo.thumb}
+              videoUrl={getStVideoUrl(activeVideo.videoUrl)}
+              poster={getStImageUrl(activeVideo.thumb)}
               title={activeVideo.title}
               instructor={activeVideo.instructor}
               subtitles={activeVideo.subtitles}
@@ -358,8 +360,8 @@ export default function InVideo({
           {/* Main Full-Featured Video Player */}
           <div className="rounded-2xl overflow-hidden shadow-2xl border border-slate-800 bg-slate-950">
             <VideoPlayer
-              videoUrl={activeVideo.videoUrl}
-              poster={activeVideo.thumb}
+              videoUrl={getStVideoUrl(activeVideo.videoUrl)}
+              poster={getStImageUrl(activeVideo.thumb)}
               title={activeVideo.title}
               instructor={activeVideo.instructor}
               subtitles={activeVideo.subtitles}
@@ -762,7 +764,7 @@ export default function InVideo({
                 >
                   <div className="relative w-32 h-20 rounded-xl overflow-hidden bg-slate-900 shrink-0">
                     <img
-                      src={v.thumb}
+                      src={getStImageUrl(v.thumb)}
                       alt={v.title}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300 opacity-90"
                     />
