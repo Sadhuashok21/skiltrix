@@ -2,6 +2,7 @@ import { Link } from "react-router-dom"
 import { useSkiltrixData } from "../context/SkiltrixDataContext"
 import { mapCourse } from "../data/apiAdapters"
 import { TechIcon } from "../components/TechIcons"
+import { getStreakData } from "../api/tutorialsApi"
 import {
   BookOpen,
   CheckCircle2,
@@ -27,12 +28,21 @@ export default function Progress() {
   })
   const quizPerformance = [...quizScores.entries()].map(([topic, scores], index) => ({ topic, score: Math.round(scores.reduce((sum, score) => sum + score, 0) / scores.length), color: ["bg-yellow-500", "bg-amber-500", "bg-purple-500", "bg-blue-500"][index % 4] }))
   const badges = apiBadges.map((badge) => ({ ...badge, name: String(badge.name ?? "Badge"), description: String(badge.description ?? ""), icon: String(badge.icon ?? "trophy"), earned: ((profile?.earned_badges as string[] | undefined) ?? []).includes(String(badge.name)) }))
+  const currentStreak = progress?.streak || profile?.current_streak || getStreakData().currentStreak || 1
+  const avgQuizScore = quizPerformance.length > 0
+    ? Math.round(quizPerformance.reduce((sum, q) => sum + q.score, 0) / quizPerformance.length)
+    : 85
+  const totalWeeklyMinutes = weeklyData.reduce((sum, d) => sum + d.minutes, 0)
+  const weeklyHours = Math.floor(totalWeeklyMinutes / 60)
+  const weeklyMins = totalWeeklyMinutes % 60
+  const weeklyTimeString = totalWeeklyMinutes > 0 ? `${weeklyHours}h ${weeklyMins}m` : `${Math.round(Number(profile?.total_learning_minutes ?? 0) / 60)}h 0m`
+  const weeklyProblemsCount = weeklyData.reduce((sum, d) => sum + d.problems, 0) || Number(progress?.problems_solved ?? 0)
   const stats = [
-    { label: "Courses Enrolled", value: String(progress?.courses_enrolled ?? 0), icon: BookOpen, color: "bg-blue-50 text-blue-600 border-blue-100" },
+    { label: "Courses Enrolled", value: String(progress?.courses_enrolled ?? enrollments.length), icon: BookOpen, color: "bg-blue-50 text-blue-600 border-blue-100" },
     { label: "Lessons Available", value: String(courses.reduce((count, course) => count + course.lessons, 0)), icon: CheckCircle2, color: "bg-emerald-50 text-emerald-600 border-emerald-100" },
     { label: "Problems Solved", value: String(progress?.problems_solved ?? 0), icon: Code2, color: "bg-purple-50 text-purple-600 border-purple-100" },
     { label: "Quizzes Passed", value: String(progress?.quizzes_passed ?? 0), icon: Target, color: "bg-orange-50 text-orange-600 border-orange-100" },
-    { label: "Current Streak", value: String(profile?.current_streak ?? progress?.streak ?? 0), icon: Flame, color: "bg-amber-50 text-amber-600 border-amber-100" },
+    { label: "Current Streak", value: String(currentStreak), icon: Flame, color: "bg-amber-50 text-amber-600 border-amber-100" },
     { label: "Total Learning Time", value: `${Math.round(Number(profile?.total_learning_minutes ?? 0) / 60)} hrs`, icon: Clock, color: "bg-slate-50 text-slate-600 border-slate-200" },
   ]
   return (
@@ -172,7 +182,7 @@ export default function Progress() {
           <div className="mt-5 pt-4 border-t border-slate-100">
             <div className="flex items-center justify-between text-sm">
               <span className="text-slate-500">Average score</span>
-              <span className="font-bold text-indigo-600">84%</span>
+              <span className="font-bold text-indigo-600">{avgQuizScore}%</span>
             </div>
           </div>
         </div>
@@ -228,10 +238,10 @@ export default function Progress() {
         </div>
         <div className="flex items-center justify-between mt-4 pt-4 border-t border-slate-100 text-sm text-slate-500">
           <span>
-            Total this week: <strong className="text-slate-900">7h 30m</strong>
+            Total this week: <strong className="text-slate-900">{weeklyTimeString}</strong>
           </span>
           <span>
-            Problems solved: <strong className="text-slate-900">17</strong>
+            Problems solved: <strong className="text-slate-900">{weeklyProblemsCount}</strong>
           </span>
         </div>
       </div>

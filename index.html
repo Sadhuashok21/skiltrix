@@ -3,10 +3,86 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="SkillTrix is an inclusive education platform that empowers learners of all ages and skill levels to master programming through interactive courses, coding practice, and community support." />
-    <meta name="robots" content="noindex, nofollow" />
+    <title>SkilTrix — Learn, Practice &amp; Code Online | SAP ABAP, CodeLab, SQL, Django</title>
+    <meta
+      name="description"
+      content="Learn, practice, and master programming with SkilTrix. In-browser SAP ABAP compiler &amp; simulator, interactive CodeLab IDE, SQL &amp; Django practice, structured developer courses, and technical interview preparation."
+    />
+    <meta name="keywords" content="SAP ABAP compiler, online ABAP editor, ABAP OO practice, CodeLab, learn SQL online, Django practice, PHP online compiler, developer interview prep, SkilTrix" />
+    <meta name="robots" content="index, follow" />
+    <meta name="theme-color" content="#4f46e5" />
+    <link rel="canonical" href="https://skiltrix.com/" />
     <link rel="icon" type="image/png" href="/logo.png" />
-    <title>SkilTrix | Ascentracore Solutions</title>
+
+    <!-- Open Graph / Social Sharing -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://skiltrix.com/" />
+    <meta property="og:site_name" content="SkilTrix" />
+    <meta property="og:title" content="SkilTrix — Learn, Practice &amp; Code Online" />
+    <meta
+      property="og:description"
+      content="Master programming with interactive coding labs, online compilers, practice problems, courses and assessments."
+    />
+    <meta property="og:image" content="/logo.png" />
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="SkilTrix — Learn, Practice &amp; Code Online" />
+    <meta
+      name="twitter:description"
+      content="Master programming with interactive coding labs, online compilers, practice problems, courses and assessments."
+    />
+    <meta name="twitter:image" content="/logo.png" />
+
+    <!-- Google Structured Data (JSON-LD) -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "WebSite",
+            "@id": "https://skiltrix.com/#website",
+            "url": "https://skiltrix.com/",
+            "name": "SkilTrix",
+            "description": "Learn, Practice & Code Online — SAP ABAP compiler, CodeLab, SQL, PHP, and Django practice",
+            "publisher": {
+              "@type": "Organization",
+              "name": "SkilTrix",
+              "url": "https://skiltrix.com/",
+              "logo": {
+                "@type": "ImageObject",
+                "url": "https://skiltrix.com/logo.png"
+              }
+            }
+          },
+          {
+            "@type": "Organization",
+            "@id": "https://skiltrix.com/#organization",
+            "name": "SkilTrix",
+            "url": "https://skiltrix.com/",
+            "logo": "https://skiltrix.com/logo.png"
+          }
+        ]
+      }
+    </script>
+    <script>
+      (function() {
+        try {
+          var saved = localStorage.getItem('skiltrix_theme') || localStorage.getItem('theme');
+          var isDark = saved === 'dark' || (!saved && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) || (saved === 'system' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+          if (isDark) {
+            document.documentElement.classList.add('dark');
+            document.documentElement.setAttribute('data-theme', 'dark');
+            document.documentElement.style.colorScheme = 'dark';
+          } else {
+            document.documentElement.classList.remove('dark');
+            document.documentElement.setAttribute('data-theme', 'light');
+            document.documentElement.style.colorScheme = 'light';
+          }
+        } catch (e) {}
+      })();
+    </script>
+    <script src="https://checkout.razorpay.com/v1/checkout.js" async></script>
   </head>
   <body>
     <div id="root"></div>

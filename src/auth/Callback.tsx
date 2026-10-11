@@ -1,13 +1,17 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { exchangeAuthorizationCode } from './pkce'
+import { AlertTriangle } from 'lucide-react'
+import { exchangeAuthorizationCode, resolveAccountsUrl } from './pkce'
+
 import { useAuth } from './AuthContext'
+import { API_ORIGIN } from '../api/client'
 
 export const AuthCallback: React.FC = () => {
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
   const { refreshSession } = useAuth()
   const [error, setError] = useState<string | null>(null)
+  const isExecutingRef = useRef(false)
 
   useEffect(() => {
     const code = searchParams.get('code')
@@ -25,10 +29,13 @@ export const AuthCallback: React.FC = () => {
       return
     }
 
+    if (isExecutingRef.current) return
+    isExecutingRef.current = true
+
     const config = {
       clientId: 'skiltrix',
-      accountsPortalUrl: (import.meta.env.VITE_ACCOUNTS_URL || 'http://localhost:5174').replace(/\/+$/, ''),
-      apiBaseUrl: (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000').replace(/\/+$/, ''),
+      accountsPortalUrl: resolveAccountsUrl(import.meta.env.VITE_ACCOUNTS_URL),
+      apiBaseUrl: API_ORIGIN,
       redirectUri: `${window.location.origin}/auth/callback`,
     }
 
@@ -48,8 +55,9 @@ export const AuthCallback: React.FC = () => {
     return (
       <div style={{ minHeight: '60vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
         <div style={{ maxWidth: '440px', textAlign: 'center', background: '#1e293b', color: '#f8fafc', padding: '2rem', borderRadius: '1rem', border: '1px solid #334155' }}>
-          <div style={{ color: '#ef4444', fontSize: '2rem', marginBottom: '1rem' }}>⚠️</div>
+          <AlertTriangle style={{ width: '2.5rem', height: '2.5rem', color: '#ef4444', margin: '0 auto 1rem', display: 'block' }} />
           <h2 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '0.5rem' }}>Authentication Error</h2>
+
           <p style={{ color: '#94a3b8', fontSize: '0.9rem', marginBottom: '1.5rem' }}>{error}</p>
           <button
             onClick={() => window.location.assign('/login')}

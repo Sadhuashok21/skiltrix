@@ -76,7 +76,7 @@ export default function About() {
               Our Mission
             </h2>
             <p className="text-slate-600 text-lg leading-relaxed mb-4">
-              SkillTrix exists to make developer education accessible,
+              SkilTrix exists to make developer education accessible,
               practical, and effective for everyone — from curious beginners to
               experienced developers preparing for their next big opportunity.
             </p>
@@ -218,7 +218,7 @@ export default function About() {
             </div>
             <div className="shrink-0 flex flex-col sm:flex-row gap-3">
               <Link
-                to="/compiler"
+                to="/compilers"
                 className="px-6 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 font-semibold text-sm text-white transition-all text-center shadow-lg shadow-indigo-600/30 whitespace-nowrap"
               >
                 Launch Compiler →
@@ -269,7 +269,7 @@ export default function About() {
             Ready to start your journey?
           </h2>
           <p className="text-indigo-100 mb-6">
-            Join 50,000+ learners already growing with SkillTrix
+            Join 50,000+ learners already growing with SkilTrix
           </p>
           <Link
             to="/courses"

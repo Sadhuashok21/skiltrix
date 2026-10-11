@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect } from "react"
+import { useLocation, useNavigate, useParams } from "react-router-dom"
 import CodeEditor from "../components/CodeEditor"
 import SyntaxComparisonModal from "../components/SyntaxComparisonModal"
 import { TechIcon } from "../components/TechIcons"
@@ -53,14 +54,42 @@ const EXTENSIONS: Record<string, string> = {
   typescript: "ts", sql: "sql", html: "html", css: "css", go: "go",
   rust: "rs", php: "php", ruby: "rb", csharp: "cs",
 }
+export const BUILTIN_LANGUAGES: LanguageDef[] = [
+  { id: "python", label: "Python", filename: "main.py" },
+  { id: "java", label: "Java", filename: "Main.java" },
+  { id: "cpp", label: "C++", filename: "main.cpp" },
+  { id: "c", label: "C", filename: "main.c" },
+  { id: "javascript", label: "JavaScript", filename: "main.js" },
+  { id: "typescript", label: "TypeScript", filename: "main.ts" },
+  { id: "sql", label: "SQL", filename: "query.sql" },
+  { id: "html", label: "HTML", filename: "index.html" },
+  { id: "css", label: "CSS", filename: "style.css" },
+  { id: "go", label: "Go", filename: "main.go" },
+  { id: "rust", label: "Rust", filename: "main.rs" },
+  { id: "php", label: "PHP", filename: "main.php" },
+  { id: "ruby", label: "Ruby", filename: "main.rb" },
+  { id: "csharp", label: "C#", filename: "main.cs" },
+  { id: "kotlin", label: "Kotlin", filename: "main.kt" },
+  { id: "swift", label: "Swift", filename: "main.swift" },
+]
+
 const DEFAULT_CODE: Record<string, string> = {
   python: 'print("Hello from SkillTrix!")\n',
   java: 'public class Main {\n    public static void main(String[] args) {\n        System.out.println("Hello from SkillTrix!");\n    }\n}\n',
   cpp: '#include <iostream>\nint main() {\n    std::cout << "Hello from SkillTrix!" << std::endl;\n    return 0;\n}\n',
   c: '#include <stdio.h>\nint main(void) {\n    printf("Hello from SkillTrix!\\n");\n    return 0;\n}\n',
   javascript: 'console.log("Hello from SkillTrix!");\n',
+  typescript: 'const message: string = "Hello from SkillTrix TypeScript!";\nconsole.log(message);\n',
   sql: "SELECT 'Hello from SkillTrix!' AS message;\n",
   html: '<!doctype html>\n<html><head><meta charset="utf-8"><title>SkillTrix preview</title></head><body><h1>Hello from SkillTrix!</h1></body></html>\n',
+  css: '/* Custom Styles */\nbody {\n  font-family: system-ui, sans-serif;\n  background-color: #0f172a;\n  color: #f8fafc;\n  padding: 2rem;\n}\n',
+  go: 'package main\n\nimport "fmt"\n\nfunc main() {\n    fmt.Println("Hello from SkillTrix!")\n}\n',
+  rust: 'fn main() {\n    println!("Hello from SkillTrix!");\n}\n',
+  php: '<?php\necho "Hello from SkillTrix!\\n";\n',
+  ruby: 'puts "Hello from SkillTrix!"\n',
+  csharp: 'using System;\n\nclass Program {\n    static void Main() {\n        Console.WriteLine("Hello from SkillTrix!");\n    }\n}\n',
+  kotlin: 'fun main() {\n    println("Hello from SkillTrix!")\n}\n',
+  swift: 'import Foundation\nprint("Hello from SkillTrix!")\n',
 }
 const getStarterCode = (language: string, snippets: ApiSnippet[], topics: SyntaxTopic[]) =>
   snippets.find((snippet) => normalize(snippet.language) === language)?.code ||
@@ -80,6 +109,50 @@ const normalize = (value: string) => {
   }
   return aliases[compact] || compact
 }
+
+export const getCompilerSlug = (langId: string): string => {
+  const compact = normalize(langId || "python")
+  return `${compact}-compiler`
+}
+
+export const getCompilerPath = (langId: string): string => {
+  const compact = normalize(langId || "python")
+  return `/compilers/${compact}-compiler`
+}
+
+export const getLangFromSlugOrUrl = (
+  pathname: string,
+  search: string,
+  paramLang?: string,
+  compilerSlug?: string,
+): string | null => {
+  if (paramLang) return normalize(paramLang.replace(/-compiler$/, ""))
+  if (compilerSlug) {
+    const clean = compilerSlug.toLowerCase().replace(/-compiler$/, "")
+    return normalize(clean)
+  }
+  const searchLang = new URLSearchParams(search).get("lang")
+  if (searchLang) return normalize(searchLang.replace(/-compiler$/, ""))
+
+  const segments = pathname.replace(/^\/+|\/+$/g, "").split("/")
+  const first = segments[0]?.toLowerCase() || ""
+  const second = segments[1]?.toLowerCase() || ""
+
+  // Case 1: /compilers/java-compiler or /compiler/java-compiler or /compilers/java or /compiler/java
+  if (first === "compilers" || first === "compiler") {
+    if (second) {
+      return normalize(second.replace(/-compiler$/, ""))
+    }
+  }
+
+  // Case 2: /java-compiler
+  if (first.endsWith("-compiler") && first !== "abap-compiler") {
+    return normalize(first.replace(/-compiler$/, ""))
+  }
+
+  return null
+}
+
 const toLanguage = (item: ApiLanguage): LanguageDef => {
   // language_id is a database key (often a generated identifier), not the runner's language name.
   const id = normalize(item.name || item.language_id)
@@ -89,13 +162,23 @@ const toLanguage = (item: ApiLanguage): LanguageDef => {
 }
 
 export default function Compiler() {
-  const [languages, setLanguages] = useState<LanguageDef[]>([])
+  const location = useLocation()
+  const navigate = useNavigate()
+  const { lang: paramLang, compilerSlug } = useParams<{ lang?: string; compilerSlug?: string }>()
+
+  const initialRequestedLang = getLangFromSlugOrUrl(location.pathname, location.search, paramLang, compilerSlug) || "python"
+  const matchedInitial = BUILTIN_LANGUAGES.find((l) => l.id === initialRequestedLang) || BUILTIN_LANGUAGES[0]
+
+  const [languages, setLanguages] = useState<LanguageDef[]>(BUILTIN_LANGUAGES)
   const [snippets, setSnippets] = useState<ApiSnippet[]>([])
   const [syntaxTopics, setSyntaxTopics] = useState<SyntaxTopic[]>([])
   const [loadError, setLoadError] = useState("")
-  const [lang, setLang] = useState("")
-  const [code, setCode] = useState("")
-  const [codeByLanguage, setCodeByLanguage] = useState<Record<string, string>>({})
+  const [apiNotice, setApiNotice] = useState("")
+  const [lang, setLang] = useState(matchedInitial.id)
+  const [code, setCode] = useState(DEFAULT_CODE[matchedInitial.id] || "")
+  const [codeByLanguage, setCodeByLanguage] = useState<Record<string, string>>(() => {
+    return Object.fromEntries(BUILTIN_LANGUAGES.map((item) => [item.id, DEFAULT_CODE[item.id] || ""]))
+  })
   const [output, setOutput] = useState("")
   const [status, setStatus] =
     useState<"idle" | "running" | "success" | "error">("idle")
@@ -113,45 +196,113 @@ export default function Compiler() {
   const [diagnosticTarget, setDiagnosticTarget] = useState<{ line: number; column: number } | null>(null)
 
   const currentLang = languages.find((l) => l.id === lang) || languages[0]
+  const currentSlug = getCompilerSlug(lang || currentLang?.id || "python")
+  const currentPathDisplay = `compilers/${currentSlug}`
 
-  useEffect(() => {
-    let alive = true
-    Promise.all([api.get("/languages/"), api.get("/snippets/"), api.get("/syntax/")])
-      .then(([languageResponse, snippetResponse, syntaxResponse]) => {
-        if (!alive) return
-        const loadedLanguages = asList<ApiLanguage>(languageResponse.data).map(toLanguage)
-        const loadedSnippets = asList<ApiSnippet>(snippetResponse.data)
-        const loadedSyntax = asList<ApiSyntax>(syntaxResponse.data).map((entry) => {
+  const loadCompilerData = useCallback(async () => {
+    setLoadError("")
+    try {
+      const [langRes, snipRes, synRes] = await Promise.allSettled([
+        api.get("/languages/"),
+        api.get("/snippets/"),
+        api.get("/syntax/"),
+      ])
+
+      let loadedLangs: LanguageDef[] = []
+      let loadedSnips: ApiSnippet[] = []
+      let loadedSyn: SyntaxTopic[] = []
+      let hadNetworkFailure = false
+
+      if (langRes.status === "fulfilled" && langRes.value?.data) {
+        const raw = asList<ApiLanguage>(langRes.value.data)
+        const parsed = raw.map(toLanguage).filter((l) => l.id && l.id !== "sd")
+        if (parsed.length > 0) {
+          // Merge with built-in languages so standard languages are always preserved
+          const existingIds = new Set(parsed.map((p) => p.id))
+          const merged = [...parsed]
+          for (const builtin of BUILTIN_LANGUAGES) {
+            if (!existingIds.has(builtin.id)) {
+              merged.push(builtin)
+            }
+          }
+          loadedLangs = merged
+        }
+      } else {
+        hadNetworkFailure = true
+      }
+
+      if (snipRes.status === "fulfilled" && snipRes.value?.data) {
+        loadedSnips = asList<ApiSnippet>(snipRes.value.data)
+      }
+
+      if (synRes.status === "fulfilled" && synRes.value?.data) {
+        loadedSyn = asList<ApiSyntax>(synRes.value.data).map((entry) => {
           const fields: Record<string, string | undefined> = {
             python: entry.python_code, java: entry.java_code, cpp: entry.cpp_code,
             c: entry.c_code, javascript: entry.javascript_code,
           }
-          const snippets = Object.fromEntries(Object.entries(fields)
+          const itemSnippets = Object.fromEntries(Object.entries(fields)
             .filter(([, value]) => Boolean(value))
             .map(([key, value]) => [key, { code: value || "", notes: entry.notes || "" }]))
-          return { id: entry.entry_id, title: entry.topic, description: entry.category, snippets }
+          return { id: entry.entry_id, title: entry.topic, description: entry.category, snippets: itemSnippets }
         })
-        setLanguages(loadedLanguages)
-        setSnippets(loadedSnippets)
-        setSyntaxTopics(loadedSyntax)
-        if (loadedLanguages.length) {
-          const initial = loadedLanguages[0]
-          const initialBuffers = Object.fromEntries(loadedLanguages.map((item) => [
-            item.id,
-            getStarterCode(item.id, loadedSnippets, loadedSyntax),
-          ]))
-          setLang(initial.id)
-          setCodeByLanguage(initialBuffers)
-          setCode(initialBuffers[initial.id] || "")
-        } else {
-          setLoadError("No active compiler languages are available from the API.")
-        }
-      })
-      .catch(() => alive && setLoadError("Could not load compiler languages and examples. Check the API connection and try refreshing."))
-    return () => { alive = false }
-  }, [])
+      }
 
-  const handleLangChange = (l: string) => {
+      if (loadedLangs.length > 0) {
+        setLanguages(loadedLangs)
+      } else {
+        loadedLangs = BUILTIN_LANGUAGES
+      }
+
+      setSnippets(loadedSnips)
+      setSyntaxTopics(loadedSyn)
+
+      if (hadNetworkFailure) {
+        setApiNotice("Offline mode: running with built-in compiler languages and starter templates.")
+      } else {
+        setApiNotice("")
+      }
+
+      // Check requested language from URL
+      const requested = getLangFromSlugOrUrl(location.pathname, location.search, paramLang, compilerSlug)
+      let initial = loadedLangs.find((l) => l.id === "python") || loadedLangs[0]
+      if (requested) {
+        const matched = loadedLangs.find((l) => l.id === requested)
+        if (matched) {
+          initial = matched
+        } else {
+          const ext = EXTENSIONS[requested] || requested
+          const filename = requested === "java" ? "Main.java" : requested === "html" ? "index.html" : requested === "sql" ? "query.sql" : `main.${ext}`
+          const fallbackDef: LanguageDef = {
+            id: requested,
+            label: requested.charAt(0).toUpperCase() + requested.slice(1),
+            filename,
+          }
+          loadedLangs.push(fallbackDef)
+          initial = fallbackDef
+          setLanguages([...loadedLangs])
+        }
+      }
+
+      const initialBuffers = Object.fromEntries(loadedLangs.map((item) => [
+        item.id,
+        getStarterCode(item.id, loadedSnips, loadedSyn),
+      ]))
+      setLang(initial.id)
+      setCodeByLanguage(initialBuffers)
+      setCode(initialBuffers[initial.id] || "")
+      const slug = getCompilerSlug(initial.id)
+      document.title = `${initial.label} Compiler (compilers/${slug}) — SkilTrix`
+    } catch (err: any) {
+      setApiNotice("Could not sync with compiler API. Offline mode active with built-in templates.")
+    }
+  }, [compilerSlug, location.pathname, location.search, paramLang])
+
+  useEffect(() => {
+    loadCompilerData()
+  }, [loadCompilerData])
+
+  const handleLangChange = useCallback((l: string, updateUrl = true) => {
     const nextCode = codeByLanguage[l] ?? getStarterCode(l, snippets, syntaxTopics)
     setCodeByLanguage((buffers) => ({ ...buffers, [lang]: code, [l]: nextCode }))
     setLang(l)
@@ -164,7 +315,29 @@ export default function Compiler() {
     } else {
       setActiveOutputTab("console")
     }
-  }
+    const slug = getCompilerSlug(l)
+    const matched = languages.find((item) => item.id === l)
+    document.title = `${matched?.label || l} Compiler (compilers/${slug}) — SkilTrix`
+
+    if (updateUrl) {
+      const targetPath = `/compilers/${slug}`
+      if (location.pathname !== targetPath) {
+        navigate(targetPath, { replace: false })
+      }
+    }
+  }, [code, codeByLanguage, lang, languages, location.pathname, navigate, snippets, syntaxTopics])
+
+  // Sync if user navigates back/forward via browser history
+  useEffect(() => {
+    if (!languages.length) return
+    const target = getLangFromSlugOrUrl(location.pathname, location.search, paramLang, compilerSlug)
+    if (target && target !== lang) {
+      const matched = languages.find((l) => l.id === target)
+      if (matched) {
+        handleLangChange(target, false)
+      }
+    }
+  }, [location.pathname, location.search, paramLang, compilerSlug, languages, lang, handleLangChange])
 
   const handleLoadCodeFromModal = useCallback(
     (newCode: string, newLang: string) => {
@@ -175,8 +348,15 @@ export default function Compiler() {
       setCompilerDiagnostics([])
       setStatus("idle")
       setActiveOutputTab("console")
+      const slug = getCompilerSlug(newLang)
+      const matched = languages.find((item) => item.id === newLang)
+      document.title = `${matched?.label || newLang} Compiler (compilers/${slug}) — SkilTrix`
+      const targetPath = `/compilers/${slug}`
+      if (location.pathname !== targetPath) {
+        navigate(targetPath, { replace: false })
+      }
     },
-    [code, lang],
+    [code, lang, languages, location.pathname, navigate],
   )
 
   const handleCodeChange = (nextCode: string) => {
@@ -269,7 +449,22 @@ export default function Compiler() {
     : `${previewPolicy}${previewMarkup}`
 
   if (!currentLang) {
-    return <div className="min-h-[calc(100vh-64px)] bg-slate-950 flex items-center justify-center p-6 text-center text-slate-300">{loadError || "Loading compiler languages…"}</div>
+    return (
+      <div className="min-h-[calc(100vh-64px)] bg-slate-950 flex flex-col items-center justify-center p-6 text-center text-slate-300 gap-4">
+        <AlertCircle className="w-8 h-8 text-indigo-400" />
+        <p>{loadError || "No compiler languages available."}</p>
+        <button
+          onClick={() => {
+            setLanguages(BUILTIN_LANGUAGES)
+            setLang("python")
+            setCode(DEFAULT_CODE.python)
+          }}
+          className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-sm font-semibold transition-colors"
+        >
+          Load Built-in Languages
+        </button>
+      </div>
+    )
   }
 
   return (
@@ -282,15 +477,22 @@ export default function Compiler() {
           </div>
           <div className="flex flex-col">
             <span
-              className="text-white font-semibold text-sm leading-tight"
+              className="text-white font-semibold text-sm leading-tight flex items-center gap-1.5"
               style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}
             >
-              Skil<span className="text-indigo-400">Trix</span> Compiler
+              <span>Skil<span className="text-indigo-400 font-bold">Trix</span></span>
+              <span className="text-slate-200 font-bold">{currentLang?.label || "Online"} Compiler</span>
             </span>
-            <span className="text-[10px] text-slate-400 leading-tight">
-              by Ascentracore Solutions
+            <span className="text-[11px] text-indigo-400 font-mono font-medium leading-tight">
+              {currentPathDisplay}
             </span>
           </div>
+        </div>
+
+        {/* Current Active Compiler Pill */}
+        <div className="hidden md:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-indigo-950/80 border border-indigo-700/60 text-indigo-300 font-mono text-xs font-semibold shadow-sm">
+          <TechIcon name={currentLang?.id || "code"} className="w-3.5 h-3.5" />
+          <span>{currentPathDisplay}</span>
         </div>
 
         {/* Language selector buttons */}
@@ -432,6 +634,21 @@ export default function Compiler() {
         )}
       </div>
 
+      {apiNotice && (
+        <div className="flex items-center justify-between px-4 py-1.5 bg-amber-950/40 border-b border-amber-800/60 text-xs text-amber-300">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+            <span>{apiNotice}</span>
+          </div>
+          <button
+            onClick={() => loadCompilerData()}
+            className="px-2.5 py-0.5 rounded bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 border border-amber-500/40 text-[11px] font-medium transition-colors"
+          >
+            Retry Connection
+          </button>
+        </div>
+      )}
+
       {/* Language Syntax Highlight Info Banner */}
       <div className="flex items-center justify-between px-4 py-1.5 bg-slate-900/60 border-b border-slate-800/80 text-xs">
         <div className="flex items-center gap-2 text-slate-300">
@@ -440,7 +657,11 @@ export default function Compiler() {
             <span>{currentLang.label}</span>
           </span>
           <span className="text-slate-600">|</span>
-          <span className="text-slate-400 hidden sm:inline">Loaded from compiler API</span>
+          <span className="font-mono text-indigo-300 font-semibold px-2 py-0.5 rounded bg-indigo-950/80 border border-indigo-800/60 text-[11px]">
+            {currentPathDisplay}
+          </span>
+          <span className="text-slate-600 hidden sm:inline">|</span>
+          <span className="text-slate-400 hidden sm:inline">In-browser runner &amp; AST diagnostics</span>
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <span className="px-2 py-0.5 rounded-full bg-slate-800 border border-slate-700/60 text-[10px] text-slate-400 font-mono">
@@ -455,12 +676,17 @@ export default function Compiler() {
         <div className="flex-1 flex flex-col border-r border-slate-800 overflow-hidden">
           {/* Editor Header Bar */}
           <div className="flex items-center justify-between px-4 py-2 bg-slate-900 border-b border-slate-800">
-            <span className="text-xs text-slate-300 font-mono flex items-center gap-1.5">
-              <TechIcon name={currentLang.id} className="w-4 h-4" />
-              <span className="font-semibold text-slate-200">
-                {currentLang.filename}
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-slate-300 font-mono flex items-center gap-1.5">
+                <TechIcon name={currentLang.id} className="w-4 h-4" />
+                <span className="font-semibold text-slate-200">
+                  {currentLang.filename}
+                </span>
               </span>
-            </span>
+              <span className="text-[10px] text-indigo-300 font-mono bg-indigo-950/80 px-2 py-0.5 rounded border border-indigo-800/60 font-medium">
+                {currentPathDisplay}
+              </span>
+            </div>
             <div className="flex items-center gap-3 text-xs text-slate-400">
               <span className="font-mono text-[11px]">
                 Ln {cursorLine}, Col {cursorCol}

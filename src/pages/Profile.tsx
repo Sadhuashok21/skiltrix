@@ -5,6 +5,8 @@ import { mapCourse } from "../data/apiAdapters"
 import { updateProfile } from "../api/profile"
 import { getGlobalSignInUrl } from "../api/auth"
 import { TechIcon } from "../components/TechIcons"
+import { getUserLevelInfo } from "../utils/levelSystem"
+import { getStreakData } from "../api/tutorialsApi"
 import {
   CheckCircle2,
   Target,
@@ -16,48 +18,14 @@ import {
   Zap,
   Check,
   Lock,
+  Camera,
+  Plus,
+  Edit3,
+  Save,
 } from "lucide-react"
 
 const tabs = ["Overview", "Courses", "Achievements", "Activity", "Saved"]
 
-const activityFeed = [
-  {
-    icon: CheckCircle2,
-    text: "Completed: Python Loops",
-    time: "1h ago",
-    color: "bg-emerald-50 text-emerald-600",
-  },
-  {
-    icon: Target,
-    text: "Quiz completed: Python Basics — 90%",
-    time: "3h ago",
-    color: "bg-indigo-50 text-indigo-600",
-  },
-  {
-    icon: Code2,
-    text: "Solved: Valid Parentheses",
-    time: "5h ago",
-    color: "bg-purple-50 text-purple-600",
-  },
-  {
-    icon: MessageSquare,
-    text: "Answered: How does Python GIL work?",
-    time: "Yesterday",
-    color: "bg-blue-50 text-blue-600",
-  },
-  {
-    icon: Trophy,
-    text: "Earned badge: 7-Day Streak",
-    time: "2 days ago",
-    color: "bg-amber-50 text-amber-600",
-  },
-  {
-    icon: BookOpen,
-    text: "Started: JavaScript Complete Guide",
-    time: "3 days ago",
-    color: "bg-orange-50 text-orange-600",
-  },
-]
 
 export default function Profile() {
   const { profile, progress, discussions, enrollments, badges: apiBadges, activity, refresh } = useSkiltrixData()
@@ -79,6 +47,7 @@ export default function Profile() {
   const [saving, setSaving] = useState(false)
   const userRecord = profile?.user as Record<string, unknown> | undefined
   const initials = name.split(/\s+/).map((part) => part[0]).join("").slice(0, 2).toUpperCase() || "?"
+  const levelInfo = getUserLevelInfo(progress, profile)
 
   useEffect(() => {
     setBio(String(profile?.bio ?? ""))
@@ -125,8 +94,12 @@ export default function Profile() {
                 {initials}
               </div>
               {editing && (
-                <button className="absolute bottom-0 right-0 w-6 h-6 bg-indigo-600 rounded-full flex items-center justify-center text-white text-xs border-2 border-white">
-                  +
+                <button
+                  type="button"
+                  className="absolute bottom-0 right-0 w-7 h-7 bg-indigo-600 hover:bg-indigo-700 rounded-full flex items-center justify-center text-white border-2 border-white shadow-sm transition-colors"
+                  title="Upload profile photo"
+                >
+                  <Camera className="w-3.5 h-3.5" />
                 </button>
               )}
             </div>
@@ -153,14 +126,25 @@ export default function Profile() {
             <div className="flex gap-2 self-start sm:self-auto">
               <button
                 onClick={() => void toggleEditing()}
-                className={`px-4 py-2 text-sm font-semibold rounded-xl transition-colors ${
+                className={`px-4 py-2 text-sm font-semibold rounded-xl transition-colors flex items-center gap-1.5 ${
                   editing
-                    ? "bg-indigo-600 text-white"
-                    : "border border-slate-200 text-slate-700 hover:border-indigo-300"
+                    ? "bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm"
+                    : "border border-slate-200 text-slate-700 hover:border-indigo-300 hover:bg-slate-50"
                 }`}
               >
-                {saving ? "Saving…" : editing ? "Save Profile" : "Edit Profile"}
+                {saving ? (
+                  "Saving…"
+                ) : editing ? (
+                  <>
+                    <Save className="w-4 h-4" /> Save Profile
+                  </>
+                ) : (
+                  <>
+                    <Edit3 className="w-4 h-4" /> Edit Profile
+                  </>
+                )}
               </button>
+
               {profileError && <p className="text-xs text-red-600">{profileError}</p>}
             </div>
           </div>
@@ -172,8 +156,8 @@ export default function Profile() {
               { label: "Problems Solved", value: String(progress?.problems_solved ?? 0), icon: Code2 },
               { label: "Quizzes", value: String(progress?.quizzes_passed ?? 0), icon: Target },
               { label: "Discussions", value: String(discussions.length), icon: MessageSquare },
-              { label: "Streak", value: `${profile?.current_streak ?? 0}d`, icon: Flame },
-              { label: "Level", value: String(Math.floor(Number(profile?.total_xp ?? 0) / 1000) + 1), icon: Zap },
+              { label: "Streak", value: `${progress?.streak || profile?.current_streak || getStreakData().currentStreak || 1}d`, icon: Flame },
+              { label: "Level", value: String(levelInfo.level), icon: Zap },
             ].map((s) => (
               <div key={s.label} className="text-center">
                 <div
@@ -225,10 +209,14 @@ export default function Profile() {
               ),
             )}
             {editing && (
-              <button className="text-xs font-medium border border-dashed border-indigo-300 text-indigo-500 px-2.5 py-1 rounded-lg">
-                + Add Skill
+              <button
+                type="button"
+                className="text-xs font-medium border border-dashed border-indigo-300 text-indigo-500 hover:border-indigo-500 hover:text-indigo-600 px-2.5 py-1 rounded-lg flex items-center gap-1 transition-colors"
+              >
+                <Plus className="w-3 h-3" /> Add Skill
               </button>
             )}
+
           </div>
         </div>
       </div>
@@ -323,28 +311,28 @@ export default function Profile() {
 
           <div className="space-y-5">
             {/* Level card */}
-            <div className="bg-gradient-to-br from-indigo-600 to-violet-600 rounded-xl p-5 text-white">
+            <div className="bg-gradient-to-br from-indigo-600 to-violet-600 rounded-xl p-5 text-white shadow-sm">
               <div className="flex items-center justify-between mb-3">
                 <span className="text-sm font-semibold opacity-80">
                   Current Level
                 </span>
-                <span className="text-xs bg-white/20 px-2 py-0.5 rounded-full">
-                  Level 12
+                <span className="text-xs bg-white/20 px-2 py-0.5 rounded-full font-medium">
+                  Level {levelInfo.level}
                 </span>
               </div>
               <div
                 className="text-3xl font-extrabold mb-1"
                 style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}
               >
-                4,280 XP
+                {levelInfo.formattedTotalXp}
               </div>
-              <div className="h-2 bg-white/20 rounded-full mb-2">
+              <div className="h-2 bg-white/20 rounded-full mb-2 overflow-hidden">
                 <div
-                  className="h-full bg-white rounded-full"
-                  style={{ width: "68%" }}
+                  className="h-full bg-white rounded-full transition-all duration-500"
+                  style={{ width: `${levelInfo.progressPercent}%` }}
                 />
               </div>
-              <p className="text-xs text-indigo-200">720 XP to Level 13</p>
+              <p className="text-xs text-indigo-200">{levelInfo.formattedXpNeeded}</p>
             </div>
 
             {/* Recent badges */}

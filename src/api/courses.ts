@@ -44,9 +44,56 @@ export async function getCourseModules(courseId: string) {
   return asList<ApiModule>(data, "modules")
 }
 
-export async function enrollCourse(courseId: string) {
+export interface EnrollCourseResponse {
+  status: boolean
+  message?: string
+  requires_payment?: boolean
+  already_enrolled?: boolean
+  created?: boolean
+  order_id?: string
+  amount_paise?: number
+  amount_rupees?: number
+  currency?: string
+  key_id?: string
+  course_name?: string
+  user_name?: string
+  user_email?: string
+  enrollment?: any
+}
+
+export interface VerifyEnrollmentPaymentPayload {
+  razorpay_order_id: string
+  razorpay_payment_id: string
+  razorpay_signature: string
+  course_id: string
+  user_id?: string
+}
+
+export async function enrollCourse(courseId: string): Promise<EnrollCourseResponse> {
   const userId = localStorage.getItem("user_id")
-  if (!userId) throw new Error("Sign in before enrolling in a course.")
   const { data } = await api.post("/actions/enroll-course/", { user_id: userId, course_id: courseId })
   return data
 }
+
+export async function verifyEnrollmentPayment(payload: VerifyEnrollmentPaymentPayload) {
+  const userId = localStorage.getItem("user_id")
+  const { data } = await api.post("/actions/verify-enrollment-payment/", {
+    ...payload,
+    user_id: payload.user_id || userId,
+  })
+  return data
+}
+
+export async function cancelEnrollmentPayment(orderId: string, reason?: string) {
+  const { data } = await api.post("/actions/cancel-enrollment-payment/", {
+    order_id: orderId,
+    reason: reason || "Checkout closed by candidate",
+  })
+  return data
+}
+
+export async function getRazorpayConfig() {
+  const { data } = await api.get("/actions/razorpay-config/")
+  return data
+}
+

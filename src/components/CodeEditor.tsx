@@ -398,13 +398,17 @@ export default function CodeEditor({
           autoComplete="off"
           autoCorrect="off"
           readOnly={readOnly}
-          className="absolute inset-0 m-0 p-4 whitespace-pre overflow-auto resize-none outline-none font-mono border-0 bg-transparent text-transparent caret-indigo-400 selection:bg-indigo-500/35 selection:text-transparent"
+          className="code-editor-textarea absolute inset-0 m-0 p-4 whitespace-pre overflow-auto resize-none outline-none font-mono border-0 bg-transparent text-transparent caret-indigo-400 selection:bg-indigo-500/35 selection:text-transparent"
           style={{
             fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
             fontSize: currentFont.fontSize,
             lineHeight: currentFont.lineHeight,
             tabSize: 4,
+            background: "transparent",
+            backgroundColor: "transparent",
+            color: "transparent",
             WebkitTextFillColor: "transparent",
+            caretColor: "#818cf8",
           }}
         />
       </div>

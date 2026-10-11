@@ -2,6 +2,8 @@ import { Link } from "react-router-dom"
 import { useSkiltrixData } from "../context/SkiltrixDataContext"
 import { mapCourse } from "../data/apiAdapters"
 import { TechIcon } from "../components/TechIcons"
+import { getUserLevelInfo } from "../utils/levelSystem"
+import { getStreakData } from "../api/tutorialsApi"
 import {
   CheckCircle2,
   BarChart3,
@@ -118,12 +120,14 @@ const recommended = [
 
 export default function Dashboard() {
   const { courses: apiCourses, problems, quizzes, videos, enrollments, badges: apiBadges, profile, progress, activity } = useSkiltrixData()
+  const levelInfo = getUserLevelInfo(progress, profile)
+  const currentStreak = progress?.streak || profile?.current_streak || getStreakData().currentStreak || 1
   const courses = enrollments.map((item) => mapCourse(item.course, item.progress_percent))
   const earnedNames = (profile?.earned_badges as string[] | undefined) ?? []
   const badges = apiBadges.map((badge) => ({ name: String(badge.name ?? "Badge"), icon: String(badge.icon ?? "trophy"), earned: earnedNames.includes(String(badge.name)) }))
   const statCards = [
-    { label: "Day Streak", value: String(progress?.streak ?? 0), icon: <Flame className="w-5 h-5 text-orange-500" />, color: "text-orange-500", sub: "Current streak" },
-    { label: "XP Points", value: String(progress?.xp ?? 0), icon: <Zap className="w-5 h-5 text-yellow-500" />, color: "text-yellow-500", sub: "Earned XP" },
+    { label: "Day Streak", value: String(currentStreak), icon: <Flame className="w-5 h-5 text-orange-500" />, color: "text-orange-500", sub: "Current streak" },
+    { label: "XP Points", value: levelInfo.totalXp.toLocaleString(), icon: <Zap className="w-5 h-5 text-yellow-500" />, color: "text-yellow-500", sub: "Earned XP" },
     { label: "Problems Solved", value: String(progress?.problems_solved ?? 0), icon: <CheckCircle2 className="w-5 h-5 text-green-500" />, color: "text-green-500", sub: "All time" },
     { label: "Quizzes Passed", value: String(progress?.quizzes_passed ?? 0), icon: <Target className="w-5 h-5 text-indigo-500" />, color: "text-indigo-500", sub: "All time" },
   ]
@@ -147,6 +151,8 @@ export default function Dashboard() {
   ]
   const completedGoals = goals.map((goal, index) => goal.done ? index : -1).filter((index) => index >= 0)
 
+  const displayName = [profile?.user?.name, profile?.user?.lastname].filter(Boolean).join(" ") || profile?.user?.username || "Learner"
+
   return (
     <div className="max-w-[1440px] mx-auto px-4 lg:px-8 py-8">
       {/* Greeting */}
@@ -156,44 +162,38 @@ export default function Dashboard() {
             className="text-2xl font-extrabold text-slate-900"
             style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}
           >
-            Good morning, Jordan
+            Welcome back, {displayName}
           </h1>
           <p className="text-slate-500 mt-1">
-            You're on a 14-day streak. Don't break it today!
+            You're on a {currentStreak}-day streak. Keep your momentum going!
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2.5">
           <Link
-            to="/compiler"
-            className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-4 py-2.5 rounded-xl text-sm transition-colors"
+            to="/abap/editor"
+            className="inline-flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-3.5 py-2 rounded-xl text-xs sm:text-sm transition-colors shadow-sm"
           >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="16"
-              height="16"
-              fill="currentColor"
-              className="bi bi-laptop"
-              viewBox="0 0 16 16"
-            >
-              <path d="M13.5 3a.5.5 0 0 1 .5.5V11H2V3.5a.5.5 0 0 1 .5-.5zm-11-1A1.5 1.5 0 0 0 1 3.5V12h14V3.5A1.5 1.5 0 0 0 13.5 2zM0 12.5h16a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 0 12.5" />
-            </svg>
-            Open Compiler
+            <Terminal className="w-4 h-4" />
+            <span>ABAP Studio</span>
+          </Link>
+          <Link
+            to="/codelab"
+            className="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-3.5 py-2 rounded-xl text-xs sm:text-sm transition-colors shadow-sm"
+          >
+            <Code2 className="w-4 h-4" />
+            <span>CodeLab IDE</span>
+          </Link>
+          <Link
+            to="/compilers"
+            className="inline-flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 text-white font-semibold px-3.5 py-2 rounded-xl text-xs sm:text-sm transition-colors"
+          >
+            <span>Compilers</span>
           </Link>
           <Link
             to="/practice"
-            className="inline-flex items-center gap-2 bg-white border border-slate-200 hover:border-indigo-300 text-slate-700 font-semibold px-4 py-2.5 rounded-xl text-sm transition-colors"
+            className="inline-flex items-center gap-1.5 bg-white border border-slate-200 hover:border-indigo-300 text-slate-700 font-semibold px-3.5 py-2 rounded-xl text-xs sm:text-sm transition-colors"
           >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="16"
-              height="16"
-              fill="currentColor"
-              className="bi bi-pc-display"
-              viewBox="0 0 16 16"
-            >
-              <path d="M8 1a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1zm1 13.5a.5.5 0 1 0 1 0 .5.5 0 0 0-1 0m2 0a.5.5 0 1 0 1 0 .5.5 0 0 0-1 0M9.5 1a.5.5 0 0 0 0 1h5a.5.5 0 0 0 0-1zM9 3.5a.5.5 0 0 0 .5.5h5a.5.5 0 0 0 0-1h-5a.5.5 0 0 0-.5.5M1.5 2A1.5 1.5 0 0 0 0 3.5v7A1.5 1.5 0 0 0 1.5 12H6v2h-.5a.5.5 0 0 0 0 1H7v-4H1.5a.5.5 0 0 1-.5-.5v-7a.5.5 0 0 1 .5-.5H7V2z" />
-            </svg>
-            Practice
+            <span>Practice</span>
           </Link>
         </div>
       </div>
@@ -441,28 +441,28 @@ export default function Dashboard() {
           </div>
 
           {/* Level / XP */}
-          <div className="bg-gradient-to-br from-indigo-600 to-violet-600 rounded-xl p-5 text-white">
+          <div className="bg-gradient-to-br from-indigo-600 to-violet-600 rounded-xl p-5 text-white shadow-sm">
             <div className="flex items-center justify-between mb-3">
               <span className="text-sm font-semibold opacity-80">
                 Your Level
               </span>
-              <span className="text-xs bg-white/20 px-2 py-0.5 rounded-full">
-                Level {Math.floor(Number(progress?.xp ?? 0) / 1000) + 1}
+              <span className="text-xs bg-white/20 px-2 py-0.5 rounded-full font-medium">
+                Level {levelInfo.level}
               </span>
             </div>
             <div
               className="text-3xl font-extrabold mb-1"
               style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}
             >
-              4,280 XP
+              {levelInfo.formattedTotalXp}
             </div>
-            <div className="h-2 bg-white/20 rounded-full mb-2">
+            <div className="h-2 bg-white/20 rounded-full mb-2 overflow-hidden">
               <div
-                className="h-full bg-white rounded-full"
-                style={{ width: "68%" }}
+                className="h-full bg-white rounded-full transition-all duration-500"
+                style={{ width: `${levelInfo.progressPercent}%` }}
               />
             </div>
-            <p className="text-xs text-indigo-100">720 XP to Level 13</p>
+            <p className="text-xs text-indigo-100">{levelInfo.formattedXpNeeded}</p>
           </div>
 
           {/* Badges */}

@@ -1,10 +1,28 @@
 import axios from "axios"
 
 const frontendHostname = window.location.hostname || "127.0.0.1"
-const configuredApiBase = new URL(
-  import.meta.env.VITE_API_BASE_URL ||
-    `${window.location.protocol}//${frontendHostname}:8000/apps/skiltrix/api`,
-)
+const isLocal =
+  ["localhost", "127.0.0.1", "::1", ""].includes(frontendHostname) ||
+  frontendHostname.startsWith("192.168.") ||
+  frontendHostname.startsWith("10.") ||
+  frontendHostname.endsWith(".local")
+
+const rawEnvApi = (import.meta.env.VITE_API_BASE_URL || "").trim()
+
+let configuredApiBase: URL
+try {
+  // If UI is running locally but the env points to a remote domain (e.g. unresolvable or prod API),
+  // route to the local Django server on port 8000 so developers/testers don't get network failures.
+  if (isLocal && (!rawEnvApi || (!rawEnvApi.includes("localhost") && !rawEnvApi.includes("127.0.0.1") && !rawEnvApi.includes("192.168.")))) {
+    configuredApiBase = new URL(`${window.location.protocol}//${frontendHostname}:8000/apps/skiltrix/api`)
+  } else {
+    configuredApiBase = new URL(
+      rawEnvApi || `${window.location.protocol}//${frontendHostname}:8000/apps/skiltrix/api`,
+    )
+  }
+} catch {
+  configuredApiBase = new URL(`${window.location.protocol}//${frontendHostname}:8000/apps/skiltrix/api`)
+}
 
 // localhost and 127.0.0.1 are different sites to the browser. Keep local API
 // requests on the same host as the UI so Django's session cookie is included.
@@ -15,7 +33,7 @@ if (
   configuredApiBase.hostname = frontendHostname
 }
 
-const API_BASE_URL = configuredApiBase.toString().replace(/\/$/, "")
+export const API_BASE_URL = configuredApiBase.toString().replace(/\/$/, "")
 export const API_ORIGIN = new URL(API_BASE_URL).origin
 
 const api = axios.create({
