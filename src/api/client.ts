@@ -12,16 +12,16 @@ const rawEnvApi = (import.meta.env.VITE_API_BASE_URL || "").trim()
 let configuredApiBase: URL
 try {
   // If UI is running locally but the env points to a remote domain (e.g. unresolvable or prod API),
-  // route to the local Django server on port 8000 so developers/testers don't get network failures.
+  // route through the local origin (which Vite dev/preview proxies to Django port 8000).
   if (isLocal && (!rawEnvApi || (!rawEnvApi.includes("localhost") && !rawEnvApi.includes("127.0.0.1") && !rawEnvApi.includes("192.168.")))) {
-    configuredApiBase = new URL(`${window.location.protocol}//${frontendHostname}:8000/apps/skiltrix/api`)
+    configuredApiBase = new URL(`${window.location.origin}/apps/skiltrix/api`)
   } else {
     configuredApiBase = new URL(
-      rawEnvApi || `${window.location.protocol}//${frontendHostname}:8000/apps/skiltrix/api`,
+      rawEnvApi || `${window.location.origin}/apps/skiltrix/api`,
     )
   }
 } catch {
-  configuredApiBase = new URL(`${window.location.protocol}//${frontendHostname}:8000/apps/skiltrix/api`)
+  configuredApiBase = new URL(`${window.location.origin}/apps/skiltrix/api`)
 }
 
 // localhost and 127.0.0.1 are different sites to the browser. Keep local API
@@ -67,11 +67,24 @@ api.interceptors.request.use(
     const method = (config.method || "get").toLowerCase()
     const accessToken = getAccessToken()
     if (accessToken) config.headers.Authorization = `Bearer ${accessToken}`
+    const userId = localStorage.getItem("user_id")
+    if (userId) config.headers["X-User-Id"] = userId
     if (!["get", "head", "options", "trace"].includes(method)) {
-      // Fetch a fresh token for each write. Login rotates Django's CSRF secret,
-      // and the browser may not expose the API host's cookie to the UI origin.
-      const response = await axios.get(`${API_BASE_URL}/csrf/`, { withCredentials: true })
-      config.headers["X-CSRFToken"] = response.data.csrfToken
+      try {
+        const response = await axios.get(`${API_BASE_URL}/csrf/`, { withCredentials: true })
+        if (response.data?.csrfToken) {
+          config.headers["X-CSRFToken"] = response.data.csrfToken
+        }
+      } catch {
+        const cookieToken = document.cookie
+          .split(";")
+          .map((c) => c.trim())
+          .find((c) => c.startsWith("csrftoken="))
+          ?.split("=")[1]
+        if (cookieToken) {
+          config.headers["X-CSRFToken"] = decodeURIComponent(cookieToken)
+        }
+      }
     }
     return config
   },
@@ -118,6 +131,9 @@ export function getApiErrorMessage(err: any, fallbackMessage = "An unexpected er
     }
   }
   if (err.message && typeof err.message === "string" && err.message.trim()) {
+    if (err.message === "Network Error") {
+      return "Unable to connect to backend server. Please verify the SkilTrix Django server is running on port 8000."
+    }
     return err.message.trim()
   }
   return fallbackMessage

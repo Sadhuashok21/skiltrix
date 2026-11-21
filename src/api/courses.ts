@@ -6,6 +6,8 @@ export interface ApiLesson {
   title: string
   lesson_type: string
   duration_minutes: number
+  duration_seconds?: number
+  duration?: string
   is_free_preview: boolean
   order: number
 }
@@ -27,6 +29,8 @@ export interface ApiCourse {
   price: number
   instructor_name?: string
   modules: ApiModule[]
+  students_count?: number
+  rating?: number | null
 }
 
 export async function getCourses(): Promise<ApiCourse[]> {

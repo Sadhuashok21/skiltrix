@@ -1,39 +1,59 @@
 import { useState } from "react"
 import { Link } from "react-router-dom"
-import type { interviewQs as exampleQuestions } from "../data/mockData"
 import { useSkiltrixData } from "../context/SkiltrixDataContext"
 import CodeBlock from "../components/CodeBlock"
 import { TechIcon } from "../components/TechIcons"
 import { AlertTriangle, Terminal, Target } from "lucide-react"
+import { renderInlineMarkdown } from "../utils/markdownRenderer"
 
-const categories = [
-  { name: "Python", icon: "python", count: 48 },
-  { name: "JavaScript", icon: "javascript", count: 42 },
-  { name: "Java", icon: "java", count: 38 },
-  { name: "HTML & CSS", icon: "html", count: 30 },
-  { name: "DSA", icon: "dsa", count: 65 },
-  { name: "Django", icon: "django", count: 22 },
-  { name: "SQL", icon: "sql", count: 28 },
-  { name: "System Design", icon: "system", count: 18 },
-]
+export interface InterviewQuestion {
+  id: string
+  topic: string
+  difficulty: string
+  question: string
+  shortAnswer: string
+  explanation?: string
+  code?: string
+  tags?: string[]
+  frequentCompanies?: string[]
+}
+
+const getCodeLanguage = (topic: string) => {
+  const t = (topic || "").toLowerCase()
+  if (t.includes("java") && !t.includes("script")) return "java"
+  if (t.includes("sql")) return "sql"
+  if (t.includes("script") || t.includes("react")) return "javascript"
+  if (t.includes("html") || t.includes("css")) return "html"
+  return "python"
+}
 
 export default function Interview() {
   const { interviews: apiQuestions } = useSkiltrixData()
-  type InterviewQuestion = Omit<typeof exampleQuestions[number], "id"> & { id: string }
   const interviewQs: InterviewQuestion[] = apiQuestions.map((item) => ({
     id: item.interview_id,
-    topic: item.topic,
-    difficulty: item.difficulty,
+    topic: item.topic || "General",
+    difficulty: item.difficulty || "Common",
     question: item.question,
     shortAnswer: item.short_answer,
     explanation: item.explanation,
     code: item.code,
     tags: Array.isArray(item.tags) ? item.tags : [],
+    frequentCompanies: Array.isArray(item.frequent_companies) ? item.frequent_companies : [],
   }))
-  const categories = [...new Set(interviewQs.map((question) => question.topic))].map((name) => ({ name, icon: name.toLowerCase(), count: interviewQs.filter((question) => question.topic === name).length }))
+  const categories = [...new Set(interviewQs.map((question) => question.topic))].map((name) => ({
+    name,
+    icon: name.toLowerCase().replace(/[^a-z0-9]/g, ""),
+    count: interviewQs.filter((question) => question.topic === name).length,
+  }))
   const [selectedQ, setSelectedQ] = useState<InterviewQuestion | null>(null)
-
   const [activeCategory, setActiveCategory] = useState("All")
+
+  const filteredQs =
+    activeCategory === "All"
+      ? interviewQs
+      : interviewQs.filter(
+          (q) => q.topic.toLowerCase() === activeCategory.toLowerCase(),
+        )
 
   if (selectedQ) {
     return (
@@ -69,7 +89,7 @@ export default function Interview() {
                 className="text-xl font-bold text-slate-900 mb-4"
                 style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}
               >
-                {selectedQ.question}
+                {renderInlineMarkdown(selectedQ.question)}
               </h1>
 
               <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-4 mb-4">
@@ -77,7 +97,7 @@ export default function Interview() {
                   Quick Answer
                 </h3>
                 <p className="text-sm text-indigo-800">
-                  {selectedQ.shortAnswer}
+                  {renderInlineMarkdown(selectedQ.shortAnswer)}
                 </p>
               </div>
 
@@ -88,24 +108,32 @@ export default function Interview() {
                 Detailed Explanation
               </h3>
               <p className="text-sm text-slate-700 leading-relaxed mb-5">
-                {selectedQ.explanation}
+                {renderInlineMarkdown(selectedQ.explanation)}
               </p>
 
-              <h3
-                className="font-bold text-slate-900 mb-2"
-                style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}
-              >
-                Code Example
-              </h3>
-              <CodeBlock
-                code={selectedQ.code}
-                language={
-                  selectedQ.topic === "JavaScript" ? "javascript" : "python"
-                }
-                filename={`solution.${
-                  selectedQ.topic === "JavaScript" ? "js" : "py"
-                }`}
-              />
+              {selectedQ.code && (
+                <div className="mb-5">
+                  <h3
+                    className="font-bold text-slate-900 mb-2"
+                    style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}
+                  >
+                    Code Example
+                  </h3>
+                  <CodeBlock
+                    code={selectedQ.code}
+                    language={getCodeLanguage(selectedQ.topic)}
+                    filename={`solution.${
+                      getCodeLanguage(selectedQ.topic) === "javascript"
+                        ? "js"
+                        : getCodeLanguage(selectedQ.topic) === "java"
+                        ? "java"
+                        : getCodeLanguage(selectedQ.topic) === "sql"
+                        ? "sql"
+                        : "py"
+                    }`}
+                  />
+                </div>
+              )}
 
               <div className="mt-5 pt-5 border-t border-slate-100">
                 <h3
@@ -113,12 +141,10 @@ export default function Interview() {
                   style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}
                 >
                   <AlertTriangle className="w-4 h-4 text-amber-500" />
-                  <span>Common Mistake</span>
+                  <span>Key Interview Takeaway</span>
                 </h3>
-                <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-xl p-3">
-                  Confusing mutability with variable reassignment. A tuple is
-                  immutable but if it contains a list, that list can still be
-                  modified.
+                <p className="text-sm text-indigo-900 bg-indigo-50/70 border border-indigo-200/60 rounded-xl p-3">
+                  Always articulate trade-offs (time vs space complexity, mutability vs safety) when answering in technical rounds.
                 </p>
               </div>
             </div>
@@ -172,24 +198,47 @@ export default function Interview() {
                 <span>Related Quiz</span>
               </Link>
             </div>
-            <div className="bg-white rounded-xl border border-slate-200 p-5">
-              <h3
-                className="font-bold text-slate-900 mb-3"
-                style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}
-              >
-                Tags
-              </h3>
-              <div className="flex flex-wrap gap-2">
-                {selectedQ.tags.map((tag) => (
-                  <span
-                    key={tag}
-                    className="text-xs bg-indigo-50 text-indigo-600 px-2.5 py-1 rounded-lg font-medium"
-                  >
-                    {tag}
-                  </span>
-                ))}
+            {selectedQ.tags && selectedQ.tags.length > 0 && (
+              <div className="bg-white rounded-xl border border-slate-200 p-5">
+                <h3
+                  className="font-bold text-slate-900 mb-3"
+                  style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}
+                >
+                  Tags
+                </h3>
+                <div className="flex flex-wrap gap-2">
+                  {selectedQ.tags.map((tag) => (
+                    <span
+                      key={tag}
+                      className="text-xs bg-indigo-50 text-indigo-600 px-2.5 py-1 rounded-lg font-medium"
+                    >
+                      {tag}
+                    </span>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
+
+            {selectedQ.frequentCompanies && selectedQ.frequentCompanies.length > 0 && (
+              <div className="bg-white rounded-xl border border-slate-200 p-5">
+                <h3
+                  className="font-bold text-slate-900 mb-3"
+                  style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}
+                >
+                  Asked at Companies
+                </h3>
+                <div className="flex flex-wrap gap-2">
+                  {selectedQ.frequentCompanies.map((comp) => (
+                    <span
+                      key={comp}
+                      className="text-xs bg-slate-100 text-slate-700 px-2.5 py-1 rounded-lg font-semibold border border-slate-200"
+                    >
+                      {comp}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
             <button
               onClick={() => setSelectedQ(null)}
               className="w-full text-sm text-slate-500 hover:text-slate-900"
@@ -226,13 +275,34 @@ export default function Interview() {
 
       {/* Category grid */}
       <div className="grid sm:grid-cols-2 md:grid-cols-4 gap-4 mb-10">
+        <button
+          onClick={() => setActiveCategory("All")}
+          className={`group p-5 rounded-xl border text-left transition-all cursor-pointer ${
+            activeCategory === "All"
+              ? "border-indigo-400 bg-indigo-50 shadow-xs"
+              : "border-slate-200 bg-white hover:border-indigo-200 hover:shadow-sm"
+          }`}
+        >
+          <div className="w-10 h-10 rounded-lg bg-indigo-50 border border-indigo-100 flex items-center justify-center mb-3">
+            <Target className="w-5 h-5 text-indigo-600" />
+          </div>
+          <h3
+            className="font-bold text-slate-900 text-sm group-hover:text-indigo-600 transition-colors"
+            style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}
+          >
+            All Questions
+          </h3>
+          <p className="text-xs text-slate-400 mt-0.5">
+            {interviewQs.length} questions
+          </p>
+        </button>
         {categories.map((cat) => (
           <button
             key={cat.name}
             onClick={() => setActiveCategory(cat.name)}
-            className={`group p-5 rounded-xl border text-left transition-all ${
+            className={`group p-5 rounded-xl border text-left transition-all cursor-pointer ${
               activeCategory === cat.name
-                ? "border-indigo-400 bg-indigo-50"
+                ? "border-indigo-400 bg-indigo-50 shadow-xs"
                 : "border-slate-200 bg-white hover:border-indigo-200 hover:shadow-sm"
             }`}
           >
@@ -264,45 +334,63 @@ export default function Interview() {
               : `${activeCategory} Questions`}
           </h2>
           <span className="text-xs text-slate-400">
-            {interviewQs.length} questions
+            {filteredQs.length} questions
           </span>
         </div>
         <div className="divide-y divide-slate-100">
-          {interviewQs.map((q) => (
-            <button
-              key={q.id}
-              onClick={() => setSelectedQ(q)}
-              className="w-full flex items-start gap-4 px-5 py-4 text-left hover:bg-slate-50 transition-colors group"
-            >
-              <div className="w-8 h-8 rounded-lg bg-slate-100 group-hover:bg-indigo-100 flex items-center justify-center text-sm font-bold text-slate-500 group-hover:text-indigo-600 shrink-0 transition-colors">
-                {q.id}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p
-                  className="text-sm font-semibold text-slate-900 group-hover:text-indigo-600 transition-colors"
-                  style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}
-                >
-                  {q.question}
-                </p>
-                <p className="text-xs text-slate-500 mt-1">
-                  {q.shortAnswer.slice(0, 80)}...
-                </p>
-                <div className="flex flex-wrap gap-1.5 mt-2">
-                  {q.tags.map((tag) => (
-                    <span
-                      key={tag}
-                      className="text-xs bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded"
-                    >
-                      {tag}
-                    </span>
-                  ))}
+          {filteredQs.length > 0 ? (
+            filteredQs.map((q, idx) => (
+              <button
+                key={q.id}
+                onClick={() => setSelectedQ(q)}
+                className="w-full flex items-start gap-4 px-5 py-4 text-left hover:bg-slate-50 transition-colors group cursor-pointer"
+              >
+                <div className="w-8 h-8 rounded-lg bg-slate-100 group-hover:bg-indigo-100 flex items-center justify-center text-xs font-bold text-slate-600 group-hover:text-indigo-600 shrink-0 transition-colors">
+                  {idx + 1}
                 </div>
-              </div>
-              <span className="text-xs bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded-full font-medium shrink-0 mt-1">
-                {q.topic}
-              </span>
-            </button>
-          ))}
+                <div className="flex-1 min-w-0">
+                  <p
+                    className="text-sm font-semibold text-slate-900 group-hover:text-indigo-600 transition-colors"
+                    style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}
+                  >
+                    {q.question}
+                  </p>
+                  <p className="text-xs text-slate-500 mt-1 line-clamp-2">
+                    {q.shortAnswer}
+                  </p>
+                  <div className="flex flex-wrap gap-1.5 mt-2">
+                    {(q.tags || []).map((tag) => (
+                      <span
+                        key={tag}
+                        className="text-xs bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded"
+                      >
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+                <div className="flex flex-col items-end gap-1.5 shrink-0 mt-0.5">
+                  <span className="text-xs bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded-full font-medium">
+                    {q.topic}
+                  </span>
+                  <span className="text-[10px] text-slate-400 font-medium">
+                    {q.difficulty}
+                  </span>
+                </div>
+              </button>
+            ))
+          ) : (
+            <div className="p-10 text-center text-slate-400 text-sm">
+              <p className="font-semibold text-slate-700 dark:text-slate-200 mb-1">
+                {activeCategory === "All"
+                  ? "There are no interview questions added yet."
+                  : `There are no interview questions added for ${activeCategory} yet.`}
+              </p>
+              <p className="text-xs text-slate-400">
+                Check back soon or select another category from above.
+              </p>
+            </div>
+          )}
         </div>
       </div>
     </div>

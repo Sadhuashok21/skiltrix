@@ -1,4 +1,9 @@
+import { useEffect } from "react"
+
 export default function Terms() {
+  useEffect(() => {
+    window.location.replace("https://policies.ascentracoresolutions.com/")
+  }, [])
   const sections = [
     {
       id: "acceptance",

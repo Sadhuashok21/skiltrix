@@ -237,6 +237,7 @@ import {
   BookOpen,
   Award,
   Code,
+  FileCode,
   GraduationCap,
   Sparkles,
 } from "lucide-react";
@@ -277,6 +278,11 @@ export function TechIcon({
       return <ReactIcon className={className} />;
     case "php":
       return <PhpIcon className={className} />;
+    case "abap":
+    case "sap":
+    case "sap abap":
+    case "sap-abap":
+      return <FileCode className={className} />;
     case "dsa":
       return <DsaIcon className={className} />;
     case "git":

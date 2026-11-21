@@ -1,7 +1,10 @@
-import React from "react"
+import React, { useEffect } from "react"
 import { ShieldCheck, Lock, Eye, FileText, CheckCircle } from "lucide-react"
 
 export default function PrivacyPolicy() {
+  useEffect(() => {
+    window.location.replace("https://policies.ascentracoresolutions.com/")
+  }, [])
   const sections = [
     {
       id: "collection",
@@ -47,9 +50,15 @@ export default function PrivacyPolicy() {
     },
     {
       id: "cookies",
-      title: "8. Cookies & Storage",
+      title: "8. Cookies & Local Storage",
       content:
         "We use essential cookies and browser local storage to maintain your authentication session, preserve your dark/light theme preferences, and autosave coding drafts to prevent loss of progress during network fluctuations.",
+    },
+    {
+      id: "advertising",
+      title: "9. Third-Party Advertising & Google AdSense",
+      content:
+        "We may partner with third-party advertising networks such as Google AdSense to display advertisements when you visit our website. Google, as a third-party vendor, uses cookies (including the DoubleClick cookie) to serve ads based on your prior visits to this website or other sites across the internet. Google's use of advertising cookies enables it and its partners to deliver relevant advertisements tailored to your browsing behavior. You may opt out of personalized advertising by visiting Google Ads Settings (https://www.google.com/settings/ads) or through the Digital Advertising Alliance at http://www.aboutads.info/choices/.",
     },
   ]
 

@@ -1,10 +1,12 @@
 import { useState, useEffect } from "react"
+import { useSearchParams } from "react-router-dom"
 import { getVideos } from "../api/videos"
 import type { ApiVideo } from "../api/videos"
 import InVideo, { Video } from "./InVideo"
 import { getStImageUrl, getStVideoUrl } from "../utils/cdn"
 
 export default function Videos() {
+  const [searchParams, setSearchParams] = useSearchParams()
   const [activeTag, setActiveTag] = useState("All")
   const [view, setView] = useState<"list" | "watch">("list")
   const [videos, setVideos] = useState<Video[]>([])
@@ -22,12 +24,60 @@ export default function Videos() {
       const records = await getVideos()
       const mapped = records.map(mapVideo)
       setVideos(mapped)
-      setSelectedVideo(mapped[0] ?? null)
+      const targetId = searchParams.get("video_id") || searchParams.get("watch")
+      const targetVideo = targetId ? mapped.find((v) => String(v.id) === targetId) : null
+      if (targetVideo) {
+        setSelectedVideo(targetVideo)
+        setView("watch")
+      } else {
+        setSelectedVideo(mapped[0] ?? null)
+      }
     } catch {
       setError("Video lessons could not be loaded. Check the API connection and try again.")
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleSelectVideo = (video: Video) => {
+    setSelectedVideo(video)
+    setView("watch")
+    setSearchParams({ video_id: String(video.id) })
+  }
+
+  const handleBackToList = () => {
+    setView("list")
+    setSearchParams({})
+  }
+
+  const handleUpdateVideoCounts = (
+    id: string | number,
+    counts: { views?: number; likes?: number; share?: number }
+  ) => {
+    setVideos((prev) =>
+      prev.map((v) => {
+        if (String(v.id) === String(id)) {
+          return {
+            ...v,
+            ...(counts.views !== undefined ? { views: String(counts.views) } : {}),
+            ...(counts.likes !== undefined ? { likes: String(counts.likes) } : {}),
+            ...(counts.share !== undefined ? { share: String(counts.share) } : {}),
+          }
+        }
+        return v
+      })
+    )
+    setSelectedVideo((prev) => {
+      if (prev && String(prev.id) === String(id)) {
+        return {
+          ...prev,
+          ...(counts.views !== undefined ? { views: String(counts.views) } : {}),
+          ...(counts.likes !== undefined ? { likes: String(counts.likes) } : {}),
+          ...(counts.share !== undefined ? { share: String(counts.share) } : {}),
+        }
+      }
+      return prev
+    })
   }
 
   const filtered = videos.filter(
@@ -40,8 +90,9 @@ export default function Videos() {
       <InVideo
         selectedVideo={selectedVideo}
         videos={videos}
-        onSelectVideo={(video) => setSelectedVideo(video)}
-        onBackToList={() => setView("list")}
+        onSelectVideo={handleSelectVideo}
+        onBackToList={handleBackToList}
+        onUpdateVideoCounts={handleUpdateVideoCounts}
       />
     )
   }
@@ -100,10 +151,7 @@ export default function Videos() {
           </p>
         </div>
         <button
-          onClick={() => {
-            setSelectedVideo(activeHeaderVideo)
-            setView("watch")
-          }}
+          onClick={() => handleSelectVideo(activeHeaderVideo)}
           className="inline-flex items-center gap-2 bg-white text-indigo-600 font-semibold px-5 py-2.5 rounded-xl text-sm hover:bg-indigo-50 transition-colors shrink-0"
         >
           <span>Resume</span>
@@ -144,10 +192,7 @@ export default function Videos() {
         {filtered.map((v) => (
           <button
             key={v.id}
-            onClick={() => {
-              setSelectedVideo(v)
-              setView("watch")
-            }}
+            onClick={() => handleSelectVideo(v)}
             className="group bg-white rounded-xl border border-slate-200 overflow-hidden hover:shadow-lg hover:border-indigo-200 transition-all text-left"
           >
             <div className="relative h-36 overflow-hidden bg-slate-200">
@@ -219,16 +264,32 @@ export default function Videos() {
 }
 
 function mapVideo(record: ApiVideo): Video {
+  let dur = record.duration && record.duration !== "—" ? record.duration : ""
+  if (!dur && typeof record.duration_seconds === "number" && record.duration_seconds > 0) {
+    const mins = Math.floor(record.duration_seconds / 60)
+    const secs = record.duration_seconds % 60
+    dur = `${mins}:${secs.toString().padStart(2, "0")}`
+  }
+  if (!dur) {
+    try {
+      const cached = JSON.parse(localStorage.getItem("skiltrix_video_durations") || "{}")
+      if (cached[record.video_id]) {
+        dur = cached[record.video_id]
+      }
+    } catch {}
+  }
+
   return {
     id: record.video_id,
     title: record.title,
-    instructor: record.course_name || "SkilTrix",
-    duration: "—",
+    instructor: record.instructor || "Sadhu Ashok Kumar",
+    duration: dur || "—",
     views: String(record.views ?? 0),
     likes: String(record.like ?? 0),
+    share: String(record.share ?? 0),
     tag: record.course_name || "Lessons",
-    thumb: getStImageUrl(record.image),
+    thumb: record.image_url || getStImageUrl(record.image),
     date: record.created_at ? new Date(record.created_at).toLocaleDateString() : "",
-    videoUrl: getStVideoUrl(record.video),
+    videoUrl: record.video_url || getStVideoUrl(record.video),
   }
 }

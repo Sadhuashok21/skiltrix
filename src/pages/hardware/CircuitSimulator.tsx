@@ -113,6 +113,24 @@ export default function CircuitSimulator() {
     offsetY: number
   } | null>(null)
 
+  // Dragging wire segment / route state
+  const [draggingWireState, setDraggingWireState] = useState<{
+    wireId: string
+    isHorizSegment: boolean
+    initialVal: number
+    startPos: { x: number; y: number }
+  } | null>(null)
+
+  // Dragging wire endpoint to reconnect to another pin
+  const [draggingWireEndpoint, setDraggingWireEndpoint] = useState<{
+    wireId: string
+    end: "from" | "to"
+    fixedComponentId: string
+    fixedPinId: string
+    cursorX: number
+    cursorY: number
+  } | null>(null)
+
   // Canvas Viewport (Zoom & Pan)
   const [zoom, setZoom] = useState<number>(1)
   const [pan, setPan] = useState<{ x: number; y: number }>({ x: 40, y: 20 })
@@ -570,6 +588,64 @@ export default function CircuitSimulator() {
     }
   }
 
+  // Find nearest pin to world coordinates for reconnection
+  const findNearestPin = useCallback((wx: number, wy: number) => {
+    let closest: { componentId: string; pinId: string; dist: number } | null = null
+    for (const comp of components) {
+      const cat = getCatalogItem(comp.type)
+      if (!cat) continue
+      for (const pin of cat.pins) {
+        const p = getPinWorldPosition(comp, pin)
+        const dist = Math.hypot(p.x - wx, p.y - wy)
+        if (dist <= 28 && (!closest || dist < closest.dist)) {
+          closest = { componentId: comp.id, pinId: pin.id, dist }
+        }
+      }
+    }
+    return closest
+  }, [components])
+
+  // Move / Nudge wire routing segment offset in X (side by side) or Y (up and down)
+  const handleNudgeWire = useCallback((axisOrDelta: "x" | "y" | number, deltaParam?: number) => {
+    if (!selectedWireId) return
+    const axis: "x" | "y" = typeof axisOrDelta === "string" ? axisOrDelta : "y"
+    const delta: number = typeof axisOrDelta === "number" ? axisOrDelta : (deltaParam ?? 0)
+    const nextWires = wires.map((w) => {
+      if (w.id !== selectedWireId) return w
+      const c1 = components.find((c) => c.id === w.fromComponentId)
+      const c2 = components.find((c) => c.id === w.toComponentId)
+      if (!c1 || !c2) return w
+      const cat1 = getCatalogItem(c1.type)
+      const cat2 = getCatalogItem(c2.type)
+      const pin1 = cat1?.pins.find((p) => p.id === w.fromPinId)
+      const pin2 = cat2?.pins.find((p) => p.id === w.toPinId)
+      if (!pin1 || !pin2) return w
+      const p1 = getPinWorldPosition(c1, pin1)
+      const p2 = getPinWorldPosition(c2, pin2)
+
+      if (axis === "y") {
+        const curY = w.offsetY !== undefined ? w.offsetY : Math.round((p1.y + p2.y) / 2)
+        return { ...w, offsetY: curY + delta }
+      } else {
+        const curX = w.offsetX !== undefined ? w.offsetX : Math.round((p1.x + p2.x) / 2)
+        return { ...w, offsetX: curX + delta }
+      }
+    })
+    setWires(nextWires)
+    pushHistory(components, nextWires)
+  }, [selectedWireId, wires, components, pushHistory])
+
+  const handleResetWireRoute = useCallback(() => {
+    if (!selectedWireId) return
+    const nextWires = wires.map((w) =>
+      w.id === selectedWireId
+        ? { ...w, segmentOffset: undefined, offsetX: undefined, offsetY: undefined }
+        : w
+    )
+    setWires(nextWires)
+    pushHistory(components, nextWires)
+  }, [selectedWireId, wires, components, pushHistory])
+
   // Keyboard shortcuts
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
@@ -577,6 +653,8 @@ export default function CircuitSimulator() {
       if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return
       if (e.key === "Escape") {
         setDrawingWire(null)
+        setDraggingWireState(null)
+        setDraggingWireEndpoint(null)
       } else if (e.key === "Delete" || e.key === "Backspace") {
         handleDeleteSelected()
       } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") {
@@ -587,11 +665,26 @@ export default function CircuitSimulator() {
         handleRedo()
       } else if (e.key.toLowerCase() === "r" && selectedComponentId) {
         handleRotateSelected()
+      } else if (selectedWireId && (e.key === "ArrowUp" || e.key === "ArrowDown")) {
+        e.preventDefault()
+        handleNudgeWire("y", e.key === "ArrowDown" ? 10 : -10)
+      } else if (selectedWireId && (e.key === "ArrowLeft" || e.key === "ArrowRight")) {
+        e.preventDefault()
+        handleNudgeWire("x", e.key === "ArrowRight" ? 10 : -10)
+      } else if (selectedComponentId && ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key)) {
+        e.preventDefault()
+        const dx = e.key === "ArrowLeft" ? -10 : e.key === "ArrowRight" ? 10 : 0
+        const dy = e.key === "ArrowUp" ? -10 : e.key === "ArrowDown" ? 10 : 0
+        const nextComps = components.map((c) =>
+          c.id === selectedComponentId ? { ...c, x: c.x + dx, y: c.y + dy } : c
+        )
+        setComponents(nextComps)
+        pushHistory(nextComps, wires)
       }
     }
     window.addEventListener("keydown", onKeyDown)
     return () => window.removeEventListener("keydown", onKeyDown)
-  }, [handleDeleteSelected, selectedComponentId, historyIndex, history])
+  }, [handleDeleteSelected, selectedComponentId, selectedWireId, handleNudgeWire, historyIndex, history, components, wires, pushHistory])
 
   // Export / Import JSON circuit file
   const handleExportJson = () => {
@@ -1075,7 +1168,27 @@ export default function CircuitSimulator() {
                     prev ? { ...prev, cursorX: world.x, cursorY: world.y } : null
                   )
                 }
-                if (draggingComp) {
+                if (draggingWireEndpoint) {
+                  setDraggingWireEndpoint((prev) =>
+                    prev ? { ...prev, cursorX: world.x, cursorY: world.y } : null
+                  )
+                }
+                if (draggingWireState) {
+                  const delta = draggingWireState.isHorizSegment
+                    ? world.y - draggingWireState.startPos.y
+                    : world.x - draggingWireState.startPos.x
+                  const snappedVal = Math.round((draggingWireState.initialVal + delta) / 10) * 10
+                  setWires((prev) =>
+                    prev.map((w) => {
+                      if (w.id !== draggingWireState.wireId) return w
+                      if (draggingWireState.isHorizSegment) {
+                        return { ...w, offsetY: snappedVal }
+                      } else {
+                        return { ...w, offsetX: snappedVal }
+                      }
+                    })
+                  )
+                } else if (draggingComp) {
                   const snappedX = Math.round((world.x - draggingComp.offsetX) / 10) * 10
                   const snappedY = Math.round((world.y - draggingComp.offsetY) / 10) * 10
                   setComponents((prev) =>
@@ -1091,6 +1204,26 @@ export default function CircuitSimulator() {
                 }
               }}
               onMouseUp={() => {
+                if (draggingWireState) {
+                  pushHistory(components, wires)
+                  setDraggingWireState(null)
+                }
+                if (draggingWireEndpoint) {
+                  const nearest = findNearestPin(draggingWireEndpoint.cursorX, draggingWireEndpoint.cursorY)
+                  if (nearest && !(nearest.componentId === draggingWireEndpoint.fixedComponentId && nearest.pinId === draggingWireEndpoint.fixedPinId)) {
+                    const nextWires = wires.map((w) => {
+                      if (w.id !== draggingWireEndpoint.wireId) return w
+                      if (draggingWireEndpoint.end === "from") {
+                        return { ...w, fromComponentId: nearest.componentId, fromPinId: nearest.pinId }
+                      } else {
+                        return { ...w, toComponentId: nearest.componentId, toPinId: nearest.pinId }
+                      }
+                    })
+                    setWires(nextWires)
+                    pushHistory(components, nextWires)
+                  }
+                  setDraggingWireEndpoint(null)
+                }
                 if (draggingComp) {
                   pushHistory(components, wires)
                   setDraggingComp(null)
@@ -1162,9 +1295,51 @@ export default function CircuitSimulator() {
 
                   const p1 = getPinWorldPosition(c1, pin1)
                   const p2 = getPinWorldPosition(c2, pin2)
-                  const pts = computeOrthogonalWirePoints(p1, p2)
+                  const pts = computeOrthogonalWirePoints(p1, p2, w.segmentOffset, w.offsetX, w.offsetY)
                   const pathD = pointsToSvgPath(pts)
                   const isSel = w.id === selectedWireId
+
+                  // Extract all movable segments from pts
+                  const segments: Array<{
+                    id: string
+                    isHoriz: boolean
+                    midX: number
+                    midY: number
+                    currentVal: number
+                    length: number
+                  }> = []
+
+                  for (let i = 0; i < pts.length - 1; i++) {
+                    const pA = pts[i]
+                    const pB = pts[i + 1]
+                    const isH = Math.abs(pA.y - pB.y) < 1
+                    const isV = Math.abs(pA.x - pB.x) < 1
+                    const len = isH ? Math.abs(pB.x - pA.x) : Math.abs(pB.y - pA.y)
+
+                    // Skip short terminal pin stubs if there are intermediate segments
+                    const isEndStub = (i === 0 && len <= 20) || (i === pts.length - 2 && len <= 20)
+                    if (len >= 16 && (pts.length <= 3 || !isEndStub)) {
+                      segments.push({
+                        id: `seg_${i}`,
+                        isHoriz: isH,
+                        midX: Math.round((pA.x + pB.x) / 2),
+                        midY: Math.round((pA.y + pB.y) / 2),
+                        currentVal: isH ? pA.y : pA.x,
+                        length: len,
+                      })
+                    }
+                  }
+
+                  if (segments.length === 0) {
+                    segments.push({
+                      id: "fallback_h",
+                      isHoriz: true,
+                      midX: Math.round((p1.x + p2.x) / 2),
+                      midY: Math.round((p1.y + p2.y) / 2),
+                      currentVal: Math.round((p1.y + p2.y) / 2),
+                      length: 20,
+                    })
+                  }
 
                   const pinState = solverResult.pinStates[`${w.fromComponentId}:${w.fromPinId}`]
                   const isEnergized = isRunning && (pinState?.voltage ?? 0) > 2.0
@@ -1177,10 +1352,29 @@ export default function CircuitSimulator() {
                         setSelectedWireId(w.id)
                         setSelectedComponentId(null)
                       }}
+                      onMouseDown={(e) => {
+                        if (e.button !== 0) return
+                        e.stopPropagation()
+                        setSelectedWireId(w.id)
+                        setSelectedComponentId(null)
+                        const world = clientToWorld(e.clientX, e.clientY)
+                        const closest = segments.reduce<{ dist: number; seg: typeof segments[0] } | null>((best, seg) => {
+                          const d = Math.hypot(seg.midX - world.x, seg.midY - world.y)
+                          if (!best || d < best.dist) return { dist: d, seg }
+                          return best
+                        }, null)?.seg || segments[0]
+
+                        setDraggingWireState({
+                          wireId: w.id,
+                          isHorizSegment: closest.isHoriz,
+                          initialVal: closest.currentVal,
+                          startPos: world,
+                        })
+                      }}
                       className="cursor-pointer"
                     >
-                      {/* Wide invisible click hit target */}
-                      <path d={pathD} fill="none" stroke="transparent" strokeWidth={12} />
+                      {/* Wide invisible click & drag hit target */}
+                      <path d={pathD} fill="none" stroke="transparent" strokeWidth={14} />
                       {isSel && (
                         <path
                           d={pathD}
@@ -1211,11 +1405,150 @@ export default function CircuitSimulator() {
                         />
                       )}
                       {/* Connection terminal dots */}
-                      <circle cx={p1.x} cy={p1.y} r={3} fill={w.color || "#15803d"} />
-                      <circle cx={p2.x} cy={p2.y} r={3} fill={w.color || "#15803d"} />
+                      <circle cx={p1.x} cy={p1.y} r={3.5} fill={w.color || "#15803d"} />
+                      <circle cx={p2.x} cy={p2.y} r={3.5} fill={w.color || "#15803d"} />
+
+                      {/* Draggable Route Handles when wire is selected: both Up/Down and Side-by-Side */}
+                      {isSel &&
+                        segments.map((seg) => (
+                          <g
+                            key={seg.id}
+                            onMouseDown={(e) => {
+                              e.stopPropagation()
+                              const world = clientToWorld(e.clientX, e.clientY)
+                              setDraggingWireState({
+                                wireId: w.id,
+                                isHorizSegment: seg.isHoriz,
+                                initialVal: seg.currentVal,
+                                startPos: world,
+                              })
+                            }}
+                            style={{ cursor: seg.isHoriz ? "ns-resize" : "ew-resize" }}
+                          >
+                            <title>{seg.isHoriz ? "Drag UP or DOWN" : "Drag SIDE BY SIDE (Left / Right)"}</title>
+                            {seg.isHoriz ? (
+                              <g transform={`translate(${seg.midX}, ${seg.midY})`}>
+                                <rect
+                                  x={-14}
+                                  y={-6}
+                                  width={28}
+                                  height={12}
+                                  rx={6}
+                                  fill="#0284c7"
+                                  stroke="#ffffff"
+                                  strokeWidth={1.5}
+                                  className="shadow-md"
+                                />
+                                <line x1={-7} y1={-2} x2={7} y2={-2} stroke="#ffffff" strokeWidth={1.2} />
+                                <line x1={-7} y1={2} x2={7} y2={2} stroke="#ffffff" strokeWidth={1.2} />
+                              </g>
+                            ) : (
+                              <g transform={`translate(${seg.midX}, ${seg.midY})`}>
+                                <rect
+                                  x={-6}
+                                  y={-14}
+                                  width={12}
+                                  height={28}
+                                  rx={6}
+                                  fill="#0284c7"
+                                  stroke="#ffffff"
+                                  strokeWidth={1.5}
+                                  className="shadow-md"
+                                />
+                                <line x1={-2} y1={-7} x2={-2} y2={7} stroke="#ffffff" strokeWidth={1.2} />
+                                <line x1={2} y1={-7} x2={2} y2={7} stroke="#ffffff" strokeWidth={1.2} />
+                              </g>
+                            )}
+                          </g>
+                        ))}
+
+                      {/* Draggable Endpoint Reconnect Handles when wire is selected */}
+                      {isSel && (
+                        <>
+                          <circle
+                            cx={p1.x}
+                            cy={p1.y}
+                            r={6}
+                            fill="#38bdf8"
+                            stroke="#ffffff"
+                            strokeWidth={2}
+                            className="cursor-grab active:cursor-grabbing hover:scale-125 transition-transform"
+                            onMouseDown={(e) => {
+                              e.stopPropagation()
+                              setDraggingWireEndpoint({
+                                wireId: w.id,
+                                end: "from",
+                                fixedComponentId: w.toComponentId,
+                                fixedPinId: w.toPinId,
+                                cursorX: p1.x,
+                                cursorY: p1.y,
+                              })
+                            }}
+                          >
+                            <title>Drag to reconnect from-pin</title>
+                          </circle>
+                          <circle
+                            cx={p2.x}
+                            cy={p2.y}
+                            r={6}
+                            fill="#38bdf8"
+                            stroke="#ffffff"
+                            strokeWidth={2}
+                            className="cursor-grab active:cursor-grabbing hover:scale-125 transition-transform"
+                            onMouseDown={(e) => {
+                              e.stopPropagation()
+                              setDraggingWireEndpoint({
+                                wireId: w.id,
+                                end: "to",
+                                fixedComponentId: w.fromComponentId,
+                                fixedPinId: w.fromPinId,
+                                cursorX: p2.x,
+                                cursorY: p2.y,
+                              })
+                            }}
+                          >
+                            <title>Drag to reconnect to-pin</title>
+                          </circle>
+                        </>
+                      )}
                     </g>
                   )
                 })}
+
+                {/* Endpoint Drag Reconnection Preview Wire */}
+                {draggingWireEndpoint &&
+                  (() => {
+                    const fixedComp = components.find((c) => c.id === draggingWireEndpoint.fixedComponentId)
+                    const fixedCat = fixedComp ? getCatalogItem(fixedComp.type) : undefined
+                    const fixedPin = fixedCat?.pins.find((p) => p.id === draggingWireEndpoint.fixedPinId)
+                    if (!fixedComp || !fixedPin) return null
+                    const fixedPos = getPinWorldPosition(fixedComp, fixedPin)
+                    const previewPts = computeOrthogonalWirePoints(fixedPos, {
+                      x: draggingWireEndpoint.cursorX,
+                      y: draggingWireEndpoint.cursorY,
+                      leadDirection: "none",
+                    })
+                    const nearestPin = findNearestPin(draggingWireEndpoint.cursorX, draggingWireEndpoint.cursorY)
+                    return (
+                      <g pointerEvents="none">
+                        <path
+                          d={pointsToSvgPath(previewPts)}
+                          fill="none"
+                          stroke="#38bdf8"
+                          strokeWidth={2.5}
+                          strokeDasharray="4 4"
+                        />
+                        <circle
+                          cx={draggingWireEndpoint.cursorX}
+                          cy={draggingWireEndpoint.cursorY}
+                          r={nearestPin ? 8 : 5}
+                          fill={nearestPin ? "#22c55e" : "#38bdf8"}
+                          stroke="#ffffff"
+                          strokeWidth={2}
+                        />
+                      </g>
+                    )
+                  })()}
 
                 {/* 2. Render Active Wire Preview While Drawing */}
                 {drawingWire &&
@@ -1830,9 +2163,44 @@ export default function CircuitSimulator() {
                 <div>From: {selectedWire.fromPinId}</div>
                 <div>To: {selectedWire.toPinId}</div>
               </div>
+
+              {/* Wire Route Position Adjustment */}
+              <div className="space-y-2 p-2.5 rounded bg-slate-950/80 border border-slate-800">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-300 block">
+                  Wire Routing &amp; Movement
+                </span>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => handleNudgeWire("y", -10)}
+                    className="py-1.5 px-2 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-mono flex items-center justify-center gap-1 transition shadow-sm"
+                    title="Move wire route segment up / left by 10px"
+                  >
+                    ◀ / ▲ Move -10
+                  </button>
+                  <button
+                    onClick={() => handleNudgeWire("y", 10)}
+                    className="py-1.5 px-2 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-mono flex items-center justify-center gap-1 transition shadow-sm"
+                    title="Move wire route segment down / right by 10px"
+                  >
+                    ▶ / ▼ Move +10
+                  </button>
+                </div>
+                {selectedWire.segmentOffset !== undefined && (
+                  <button
+                    onClick={handleResetWireRoute}
+                    className="w-full py-1 text-slate-400 hover:text-indigo-400 text-[11px] transition"
+                  >
+                    Reset to Default Route
+                  </button>
+                )}
+                <p className="text-[10px] text-slate-500 leading-tight">
+                  💡 Drag the wire handle on canvas or use Arrow keys to move. Drag the blue end circles to reconnect pins.
+                </p>
+              </div>
+
               <button
                 onClick={handleDeleteSelected}
-                className="w-full py-1.5 bg-rose-600 hover:bg-rose-500 text-white rounded text-xs font-medium"
+                className="w-full py-1.5 bg-rose-600 hover:bg-rose-500 text-white rounded text-xs font-medium transition"
               >
                 Delete Wire
               </button>

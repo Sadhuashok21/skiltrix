@@ -1,9 +1,10 @@
-import { useState } from "react"
-import { Link } from "react-router-dom"
+import { useState, useEffect } from "react"
+import { Link, useSearchParams } from "react-router-dom"
 import { useSkiltrixData } from "../context/SkiltrixDataContext"
 import { mapCourse } from "../data/apiAdapters"
 import { getStImageUrl } from "../utils/cdn"
 import { TechIcon } from "../components/TechIcons"
+import { API_ORIGIN } from "../api/client"
 
 const difficulties = ["All", "Beginner", "Intermediate", "Advanced"]
 const sortOptions = ["Popular", "Newest", "Highest Rated", "Most Students"]
@@ -35,14 +36,61 @@ function ProgressBar({ value }: { value: number }) {
 }
 
 export default function Courses() {
-  const { courses: apiCourses, enrollments, loading } = useSkiltrixData()
+  const { courses: apiCourses, enrollments, loading: apiLoading } = useSkiltrixData()
+  const [cmsCourses, setCmsCourses] = useState<any[]>([])
+
+  useEffect(() => {
+    const url = `${API_ORIGIN}/api/cms/courses/`
+    fetch(url)
+      .then(async (res) => {
+        if (!res.ok) return null
+        const contentType = res.headers.get("content-type") || ""
+        if (!contentType.includes("application/json")) return null
+        return res.json()
+      })
+      .then((data) => {
+        if (data && data.courses) {
+          const mapped = data.courses
+            .filter((c: any) => c.status === "published")
+            .map((c: any) => ({
+              id: c.slug,
+              course_id: c.course_id,
+              title: c.title,
+              description: c.description,
+              technology: c.category || "Programming",
+              difficulty: "Beginner",
+              isCms: true,
+              url: `/courses/${c.slug}/`,
+              rating: null,
+              price: 0,
+              icon: c.icon || "code",
+              page_count: c.pages_count || 1,
+            }))
+          setCmsCourses(mapped)
+        }
+      })
+      .catch((err) => console.error("Failed to load CMS courses in catalog:", err))
+  }, [])
+
   const progressByCourse = new Map(enrollments.map((item) => [item.course.course_id, item.progress_percent]))
-  const courses = apiCourses.map((course) => mapCourse(course, progressByCourse.get(course.course_id) ?? 0))
+  const mappedApiCourses = apiCourses.map((course) => mapCourse(course, progressByCourse.get(course.course_id) ?? 0))
+  const courses = [...cmsCourses, ...mappedApiCourses]
+  const loading = apiLoading && cmsCourses.length === 0
   const technologies = [...new Set(courses.map((course) => course.technology))].map((name) => ({ name, icon: name.toLowerCase(), color: "bg-indigo-50 text-indigo-700" }))
-  const [search, setSearch] = useState("")
+  const [searchParams] = useSearchParams()
+  const initialSearch = searchParams.get("search") || ""
+  const initialTech = searchParams.get("tech") || "All"
+  const [search, setSearch] = useState(initialSearch)
   const [difficulty, setDifficulty] = useState("All")
-  const [tech, setTech] = useState("All")
+  const [tech, setTech] = useState(initialTech)
   const [sort, setSort] = useState("Popular")
+
+  useEffect(() => {
+    const q = searchParams.get("search")
+    const t = searchParams.get("tech")
+    if (q !== null) setSearch(q)
+    if (t !== null) setTech(t)
+  }, [searchParams])
 
   const filtered = courses.filter((c) => {
     const matchSearch =
@@ -205,7 +253,7 @@ export default function Courses() {
           {filtered.map((course) => (
             <Link
               key={course.id}
-              to={`/courses/${course.id}`}
+              to={course.url || `/courses/${course.id}`}
               className="group bg-white rounded-xl border border-slate-200 overflow-hidden hover:shadow-lg hover:border-indigo-200 transition-all duration-200"
             >
               <div className="relative h-40 overflow-hidden bg-slate-100">
@@ -217,23 +265,30 @@ export default function Courses() {
                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent" />
                 <div className="absolute top-3 left-3 flex items-center gap-1.5">
                   <DifficultyBadge level={course.difficulty} />
+                  {course.isCms && (
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-600/90 text-white shadow">
+                      Curated Syllabus
+                    </span>
+                  )}
                 </div>
                 <div className="absolute bottom-3 left-3 w-8 h-8 rounded-lg bg-white/95 backdrop-blur-sm p-1.5 flex items-center justify-center shadow">
                   <TechIcon name={course.icon || course.technology} className="w-5 h-5" />
                 </div>
-                <div className="absolute bottom-3 right-3 flex items-center gap-1 text-white text-xs font-semibold">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="16"
-                    height="16"
-                    fill="currentColor"
-                    className="bi bi-star-fill"
-                    viewBox="0 0 16 16"
-                  >
-                    <path d="M3.612 15.443c-.386.198-.824-.149-.746-.592l.83-4.73L.173 6.765c-.329-.314-.158-.888.283-.95l4.898-.696L7.538.792c.197-.39.73-.39.927 0l2.184 4.327 4.898.696c.441.062.612.636.282.95l-3.522 3.356.83 4.73c.078.443-.36.79-.746.592L8 13.187l-4.389 2.256z" />
-                  </svg>
-                  {course.rating || "—"}
-                </div>
+                {course.rating !== null && course.rating !== undefined && (
+                  <div className="absolute bottom-3 right-3 flex items-center gap-1 text-white text-xs font-semibold bg-black/60 backdrop-blur-sm px-2 py-0.5 rounded-md">
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="12"
+                      height="12"
+                      fill="currentColor"
+                      className="bi bi-star-fill text-amber-400"
+                      viewBox="0 0 16 16"
+                    >
+                      <path d="M3.612 15.443c-.386.198-.824-.149-.746-.592l.83-4.73L.173 6.765c-.329-.314-.158-.888.283-.95l4.898-.696L7.538.792c.197-.39.73-.39.927 0l2.184 4.327 4.898.696c.441.062.612.636.282.95l-3.522 3.356.83 4.73c.078.443-.36.79-.746.592L8 13.187l-4.389 2.256z" />
+                    </svg>
+                    <span>{typeof course.rating === "number" ? course.rating.toFixed(1) : course.rating}</span>
+                  </div>
+                )}
               </div>
               <div className="p-5">
                 <div className="flex items-center justify-between mb-1">
@@ -292,7 +347,11 @@ export default function Courses() {
                     >
                       <path d="M7 14s-1 0-1-1 1-4 5-4 5 3 5 4-1 1-1 1zm4-6a3 3 0 1 0 0-6 3 3 0 0 0 0 6m-5.784 6A2.24 2.24 0 0 1 5 13c0-1.355.68-2.75 1.936-3.72A6.3 6.3 0 0 0 5 9c-4 0-5 3-5 4s1 1 1 1zM4.5 8a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5" />
                     </svg>
-                    {course.students ? `${(course.students / 1000).toFixed(0)}K` : "—"}
+                    {course.students > 0
+                      ? (course.students >= 1000
+                          ? `${(course.students / 1000).toFixed(1).replace(/\.0$/, "")}K`
+                          : `${course.students} learner${course.students !== 1 ? "s" : ""}`)
+                      : "0 learners"}
                   </span>
                 </div>
                 {course.progress > 0 ? (
@@ -306,18 +365,18 @@ export default function Courses() {
                       </span>
                     </div>
                     <ProgressBar value={course.progress} />
-                    <button className="mt-3 w-full bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold py-2 rounded-lg transition-colors">
+                    <span className="inline-block text-center mt-3 w-full bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold py-2 rounded-lg transition-colors">
                       Continue →
-                    </button>
+                    </span>
                   </div>
                 ) : (course.price || 0) > 0 ? (
-                  <button className="w-full bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold py-2 rounded-lg transition-colors shadow-sm">
+                  <span className="inline-block text-center w-full bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold py-2 rounded-lg transition-colors shadow-sm">
                     Enroll Now &bull; ₹{(course.price || 0).toLocaleString("en-IN")}
-                  </button>
+                  </span>
                 ) : (
-                  <button className="w-full bg-slate-900 hover:bg-indigo-600 text-white text-sm font-semibold py-2 rounded-lg transition-colors">
+                  <span className="inline-block text-center w-full bg-slate-900 hover:bg-indigo-600 text-white text-sm font-semibold py-2 rounded-lg transition-colors">
                     Start Free Course
-                  </button>
+                  </span>
                 )}
               </div>
             </Link>

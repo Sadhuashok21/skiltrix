@@ -16,7 +16,6 @@ import {
   AlertCircle,
   Loader2,
 } from "lucide-react"
-import logoImg from "../assets/logo.png"
 
 export interface LanguageDef {
   id: string
@@ -81,7 +80,18 @@ const DEFAULT_CODE: Record<string, string> = {
   javascript: 'console.log("Hello from SkillTrix!");\n',
   typescript: 'const message: string = "Hello from SkillTrix TypeScript!";\nconsole.log(message);\n',
   sql: "SELECT 'Hello from SkillTrix!' AS message;\n",
-  html: '<!doctype html>\n<html><head><meta charset="utf-8"><title>SkillTrix preview</title></head><body><h1>Hello from SkillTrix!</h1></body></html>\n',
+  html: `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SkillTrix preview</title>
+</head>
+<body>
+    <h1>Hello from SkillTrix!</h1>
+</body>
+</html>
+`,
   css: '/* Custom Styles */\nbody {\n  font-family: system-ui, sans-serif;\n  background-color: #0f172a;\n  color: #f8fafc;\n  padding: 2rem;\n}\n',
   go: 'package main\n\nimport "fmt"\n\nfunc main() {\n    fmt.Println("Hello from SkillTrix!")\n}\n',
   rust: 'fn main() {\n    println!("Hello from SkillTrix!");\n}\n',
@@ -197,7 +207,6 @@ export default function Compiler() {
 
   const currentLang = languages.find((l) => l.id === lang) || languages[0]
   const currentSlug = getCompilerSlug(lang || currentLang?.id || "python")
-  const currentPathDisplay = `compilers/${currentSlug}`
 
   const loadCompilerData = useCallback(async () => {
     setLoadError("")
@@ -471,30 +480,6 @@ export default function Compiler() {
     <div className="h-[calc(100vh-64px)] flex flex-col bg-slate-950">
       {/* Top Toolbar */}
       <div className="flex items-center gap-3 px-4 py-2.5 bg-slate-900 border-b border-slate-800 flex-wrap gap-y-2">
-        <div className="flex items-center gap-2.5 shrink-0">
-          <div className="w-8 h-8 rounded-lg overflow-hidden bg-slate-900 border border-slate-700/80 p-0.5 flex items-center justify-center shadow-sm">
-            <img src={logoImg} alt="SkilTrix Logo" className="w-full h-full object-contain" />
-          </div>
-          <div className="flex flex-col">
-            <span
-              className="text-white font-semibold text-sm leading-tight flex items-center gap-1.5"
-              style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}
-            >
-              <span>Skil<span className="text-indigo-400 font-bold">Trix</span></span>
-              <span className="text-slate-200 font-bold">{currentLang?.label || "Online"} Compiler</span>
-            </span>
-            <span className="text-[11px] text-indigo-400 font-mono font-medium leading-tight">
-              {currentPathDisplay}
-            </span>
-          </div>
-        </div>
-
-        {/* Current Active Compiler Pill */}
-        <div className="hidden md:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-indigo-950/80 border border-indigo-700/60 text-indigo-300 font-mono text-xs font-semibold shadow-sm">
-          <TechIcon name={currentLang?.id || "code"} className="w-3.5 h-3.5" />
-          <span>{currentPathDisplay}</span>
-        </div>
-
         {/* Language selector buttons */}
         <div className="flex items-center gap-1 bg-slate-800/80 rounded-lg p-1 overflow-x-auto border border-slate-700/50">
           {languages.map((l) => (
@@ -656,10 +641,6 @@ export default function Compiler() {
             <TechIcon name={currentLang.id} className="w-4 h-4" />
             <span>{currentLang.label}</span>
           </span>
-          <span className="text-slate-600">|</span>
-          <span className="font-mono text-indigo-300 font-semibold px-2 py-0.5 rounded bg-indigo-950/80 border border-indigo-800/60 text-[11px]">
-            {currentPathDisplay}
-          </span>
           <span className="text-slate-600 hidden sm:inline">|</span>
           <span className="text-slate-400 hidden sm:inline">In-browser runner &amp; AST diagnostics</span>
         </div>
@@ -682,9 +663,6 @@ export default function Compiler() {
                 <span className="font-semibold text-slate-200">
                   {currentLang.filename}
                 </span>
-              </span>
-              <span className="text-[10px] text-indigo-300 font-mono bg-indigo-950/80 px-2 py-0.5 rounded border border-indigo-800/60 font-medium">
-                {currentPathDisplay}
               </span>
             </div>
             <div className="flex items-center gap-3 text-xs text-slate-400">
@@ -713,6 +691,7 @@ export default function Compiler() {
                 setCursorLine(line)
                 setCursorCol(col)
               }}
+              onRun={runCode}
             />
           </div>
         </div>

@@ -1,4 +1,6 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { getComments, createComment } from "../api/comments"
+import { likeVideo, recordVideoView, recordVideoShare, updateVideoDuration } from "../api/videos"
 import { Link, useNavigate } from "react-router-dom"
 import VideoPlayer, { SubtitleItem, ChapterItem } from "../components/VideoPlayer"
 import CodeBlock from "../components/CodeBlock"
@@ -28,8 +30,10 @@ export interface Video {
   title: string
   instructor: string
   duration: string
+  duration_seconds?: number
   views: string
   likes: string
+  share?: string
   tag: string
   thumb: string
   date: string
@@ -40,209 +44,44 @@ export interface Video {
   subtitles?: Record<string, SubtitleItem[]>
 }
 
+export function parseNumericCount(val: string | number | undefined | null): number {
+  if (val === undefined || val === null) return 0
+  if (typeof val === "number") return val
+  const str = String(val).trim().toUpperCase()
+  if (str.endsWith("K")) {
+    const num = parseFloat(str.slice(0, -1))
+    return isNaN(num) ? 0 : Math.round(num * 1000)
+  }
+  if (str.endsWith("M")) {
+    const num = parseFloat(str.slice(0, -1))
+    return isNaN(num) ? 0 : Math.round(num * 1000000)
+  }
+  const clean = parseInt(str.replace(/[^0-9]/g, ""), 10)
+  return isNaN(clean) ? 0 : clean
+}
+
+export function formatDisplayCount(count: number): string {
+  if (count >= 1000000) {
+    return `${(count / 1000000).toFixed(1).replace(/\.0$/, "")}M`
+  }
+  if (count >= 10000) {
+    return `${(count / 1000).toFixed(1).replace(/\.0$/, "")}K`
+  }
+  return count.toLocaleString()
+}
+
 export const DEFAULT_VIDEOS: Video[] = [
   {
-    id: 1,
-    title: "Python for Absolute Beginners",
-    instructor: "Maya Chen",
-    duration: "24:15",
-    views: "142K",
-    likes: "8.4K",
-    tag: "Python",
-    thumb:
-      "https://images.unsplash.com/photo-1526379095098-d400fd0bf935?w=480&h=270&fit=crop&auto=format",
-    date: "3 days ago",
-    videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4",
-    language: "python",
-    chapters: [
-      { time: 0, title: "1. Introduction to Python 3 & Philosophy" },
-      { time: 45, title: "2. Dynamic Typing & Variables" },
-      { time: 180, title: "3. Scope, Indentation & Syntax Rules" },
-      { time: 420, title: "4. Control Flow: if, elif, else" },
-      { time: 720, title: "5. Lists, Tuples & Dictionaries" },
-      { time: 1080, title: "6. Building a Complete Mini-App" },
-    ],
-    code: `# Python 3 Beginner Demo
-def calculate_grade(score: int) -> str:
-    """Returns the letter grade based on score."""
-    if score >= 90:
-        return "A (Excellent)"
-    elif score >= 80:
-        return "B (Good)"
-    elif score >= 70:
-        return "C (Satisfactory)"
-    else:
-        return "D (Needs Improvement)"
-
-students = {"Alex": 94, "Maya": 88, "Jordan": 72}
-for name, score in students.items():
-    print(f"Student {name}: Score {score} -> Grade {calculate_grade(score)}")
-`,
-    subtitles: {
-      en: [
-        { start: 0, end: 4, text: "Welcome to SkilTrix! Today we master Python programming from the ground up." },
-        { start: 4, end: 8, text: "Python uses clean indentation instead of braces to define code blocks." },
-        { start: 8, end: 14, text: "Let's inspect variables, dynamic typing, and built-in functions." },
-        { start: 14, end: 22, text: "Notice how f-strings allow effortless string formatting in Python 3.6+." },
-        { start: 22, end: 32, text: "You can click 'Load into Compiler' below to run this code live right now." },
-      ],
-      es: [
-        { start: 0, end: 4, text: "¡Bienvenidos a SkilTrix! Hoy dominamos Python desde cero." },
-        { start: 4, end: 8, text: "Python utiliza sangría limpia para definir bloques de código." },
-        { start: 8, end: 14, text: "Inspeccionemos variables y tipado dinámico en acción." },
-      ],
-      hi: [
-        { start: 0, end: 4, text: "SkilTrix में आपका स्वागत है! आज हम शुरू से Python प्रोग्रामिंग सीखेंगे।" },
-        { start: 4, end: 8, text: "Python में कोड ब्लॉक के लिए साफ़ इंडेंटेशन का उपयोग होता है।" },
-        { start: 8, end: 14, text: "आइए वेरिएबल्स और डायनामिक टाइपिंग का अभ्यास करें।" },
-      ],
-    },
-  },
-  {
-    id: 2,
-    title: "JavaScript Arrow Functions Explained",
-    instructor: "Alex Rivera",
-    duration: "18:42",
-    views: "98K",
-    likes: "6.1K",
-    tag: "JavaScript",
-    thumb:
-      "https://images.unsplash.com/photo-1627398242454-45a1465c2479?w=480&h=270&fit=crop&auto=format",
-    date: "1 week ago",
-    videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4",
-    language: "javascript",
-    chapters: [
-      { time: 0, title: "1. Traditional vs Arrow Function Syntax" },
-      { time: 90, title: "2. Implicit Returns & One-Liners" },
-      { time: 240, title: "3. Lexical 'this' Binding Demystified" },
-      { time: 540, title: "4. When NOT to Use Arrow Functions" },
-    ],
-    code: `// Modern ES6+ Arrow Functions
-const numbers = [1, 2, 3, 4, 5];
-
-// Concise implicit return
-const doubled = numbers.map(n => n * 2);
-const evens = numbers.filter(n => n % 2 === 0);
-
-console.log("Doubled:", doubled);
-console.log("Evens:", evens);
-`,
-    subtitles: {
-      en: [
-        { start: 0, end: 5, text: "Arrow functions provide clean syntax and lexical this binding." },
-        { start: 5, end: 12, text: "Notice the difference when omitting the return keyword and curly braces." },
-      ],
-    },
-  },
-  {
-    id: 3,
-    title: "Mastering React Hooks: useState & useEffect",
-    instructor: "Priya Patel",
-    duration: "32:08",
-    views: "87K",
-    likes: "5.9K",
-    tag: "React",
-    thumb:
-      "https://images.unsplash.com/photo-1633356122544-f134324a6cee?w=480&h=270&fit=crop&auto=format",
-    date: "2 weeks ago",
-    videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4",
-    language: "javascript",
-    chapters: [
-      { time: 0, title: "1. React Functional Components" },
-      { time: 120, title: "2. useState State Management" },
-      { time: 480, title: "3. useEffect Lifecycle & Cleanup" },
-    ],
-  },
-  {
-    id: 4,
-    title: "Binary Search — Step by Step",
-    instructor: "Jordan Kim",
-    duration: "15:30",
-    views: "76K",
-    likes: "4.8K",
-    tag: "DSA",
-    thumb:
-      "https://images.unsplash.com/photo-1509228627152-72ae9ae6848d?w=480&h=270&fit=crop&auto=format",
-    date: "2 weeks ago",
-    videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyBlazes.mp4",
-    language: "cpp",
-  },
-  {
-    id: 5,
-    title: "CSS Grid vs Flexbox — When to Use Each",
-    instructor: "Sam Torres",
-    duration: "21:45",
-    views: "65K",
-    likes: "4.2K",
-    tag: "CSS",
-    thumb:
-      "https://images.unsplash.com/photo-1593720219276-0b1eacd0aef4?w=480&h=270&fit=crop&auto=format",
-    date: "3 weeks ago",
-    videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/WeAreGoingOnBullrun.mp4",
-  },
-  {
-    id: 6,
-    title: "SQL JOINs Explained Visually",
-    instructor: "Lena Müller",
-    duration: "19:20",
-    views: "54K",
-    likes: "3.7K",
-    tag: "SQL",
-    thumb:
-      "https://images.unsplash.com/photo-1544383835-bda2bc66a55d?w=480&h=270&fit=crop&auto=format",
-    date: "1 month ago",
-  },
-  {
-    id: 7,
-    title: "Dynamic Programming: Top-Down vs Bottom-Up",
-    instructor: "Rahul Sharma",
-    duration: "38:15",
-    views: "49K",
-    likes: "3.5K",
-    tag: "DSA",
-    thumb:
-      "https://images.unsplash.com/photo-1516321165247-4aa89a48be28?w=480&h=270&fit=crop&auto=format",
-    date: "1 month ago",
-  },
-  {
-    id: 8,
-    title: "Java OOP: Classes, Interfaces & Inheritance",
-    instructor: "Aisha Johnson",
-    duration: "27:33",
-    views: "41K",
-    likes: "2.9K",
-    tag: "Java",
-    thumb:
-      "https://images.unsplash.com/photo-1517694712202-14dd9538aa97?w=480&h=270&fit=crop&auto=format",
-    date: "2 months ago",
-    language: "java",
-  },
-]
-
-const initialComments = [
-  {
-    user: "Jordan K.",
-    avatar: "JK",
-    time: "1h ago",
-    text: "This explanation of range() vs enumerate() really clicked for me! The subtitles and timeline chapters made review so fast.",
-    likes: 14,
-    color: "from-indigo-500 to-blue-500",
-  },
-  {
-    user: "Priya S.",
-    avatar: "PS",
-    time: "3h ago",
-    text: "Super clear — loaded the code directly into the compiler and tested all edge cases.",
-    likes: 9,
-    color: "from-pink-500 to-rose-500",
-  },
-  {
-    user: "Marcus L.",
-    avatar: "ML",
-    time: "5h ago",
-    text: "The audio tracks and 10-second skip shortcuts are super handy when taking notes!",
-    likes: 6,
-    color: "from-emerald-500 to-teal-500",
+    id: "default",
+    title: "Lesson Overview",
+    instructor: "SkilTrix Instructor",
+    duration: "—",
+    views: "0",
+    likes: "0",
+    share: "0",
+    tag: "Lessons",
+    thumb: "",
+    date: "",
   },
 ]
 
@@ -251,6 +90,10 @@ interface InVideoProps {
   videos?: Video[]
   onSelectVideo?: (video: Video) => void
   onBackToList?: () => void
+  onUpdateVideoCounts?: (
+    id: string | number,
+    counts: { views?: number; likes?: number; share?: number }
+  ) => void
 }
 
 export default function InVideo({
@@ -258,31 +101,308 @@ export default function InVideo({
   videos = DEFAULT_VIDEOS,
   onSelectVideo,
   onBackToList,
+  onUpdateVideoCounts,
 }: InVideoProps) {
   const navigate = useNavigate()
+  const activeVideo = selectedVideo || DEFAULT_VIDEOS[0]
+
   const [liked, setLiked] = useState(false)
+  const [disliked, setDisliked] = useState(false)
   const [saved, setSaved] = useState(false)
-  const [comments, setComments] = useState(initialComments)
+  const [copied, setCopied] = useState(false)
+  const [likesCount, setLikesCount] = useState<number>(0)
+  const [viewsCount, setViewsCount] = useState<number>(0)
+  const [shareCount, setShareCount] = useState<number>(0)
+  const [comments, setComments] = useState<
+    { user: string; avatar: string; time: string; text: string; likes: number; color: string }[]
+  >([])
   const [commentText, setCommentText] = useState("")
   const [activeTab, setActiveTab] = useState<"code" | "chapters" | "transcript" | "notes">("code")
   const [isMiniPlayer, setIsMiniPlayer] = useState(false)
+  const [isSubmittingComment, setIsSubmittingComment] = useState(false)
+  const [videoDurations, setVideoDurations] = useState<Record<string, string>>(() => {
+    try {
+      return JSON.parse(localStorage.getItem("skiltrix_video_durations") || "{}")
+    } catch {
+      return {}
+    }
+  })
 
-  const activeVideo = selectedVideo || DEFAULT_VIDEOS[0]
+  const parseDurationToSeconds = (dur?: string): number => {
+    if (!dur || dur === "—") return 0
+    const parts = dur.split(":").map(Number)
+    if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+      return parts[0] * 60 + parts[1]
+    }
+    if (parts.length === 3 && !isNaN(parts[0]) && !isNaN(parts[1]) && !isNaN(parts[2])) {
+      return parts[0] * 3600 + parts[1] * 60 + parts[2]
+    }
+    return 0
+  }
 
-  const handleAddComment = () => {
-    if (!commentText.trim()) return
-    setComments([
-      {
-        user: "You (Learner)",
-        avatar: "ME",
-        time: "Just now",
-        text: commentText.trim(),
-        likes: 0,
-        color: "from-indigo-600 to-violet-600",
-      },
-      ...comments,
-    ])
-    setCommentText("")
+  const handleDurationLoaded = (sec: number) => {
+    if (!sec || isNaN(sec) || sec <= 0) return
+    const m = Math.floor(sec / 60)
+    const s = Math.floor(sec % 60)
+    const formatted = `${m}:${s.toString().padStart(2, "0")}`
+    const vidId = String(activeVideo.id)
+
+    setVideoDurations((prev) => {
+      if (prev[vidId] === formatted) return prev
+      const next = { ...prev, [vidId]: formatted }
+      try {
+        localStorage.setItem("skiltrix_video_durations", JSON.stringify(next))
+      } catch {}
+      return next
+    })
+
+    if (!activeVideo.duration_seconds || activeVideo.duration_seconds === 0) {
+      updateVideoDuration(vidId, Math.round(sec)).catch(() => {})
+    }
+  }
+
+  useEffect(() => {
+    if (!activeVideo || !activeVideo.id) return
+    const vidId = String(activeVideo.id)
+
+    // 1. Initialize counts from activeVideo
+    const parsedLikes = parseNumericCount(activeVideo.likes)
+    const parsedViews = parseNumericCount(activeVideo.views)
+    const parsedShares = parseNumericCount(activeVideo.share)
+    setLikesCount(parsedLikes)
+    setViewsCount(parsedViews)
+    setShareCount(parsedShares)
+
+    // 2. Read liked & saved state from localStorage
+    try {
+      const likedList: string[] = JSON.parse(
+        localStorage.getItem("skiltrix_liked_videos") || "[]"
+      )
+      setLiked(likedList.includes(vidId))
+      const savedList: string[] = JSON.parse(
+        localStorage.getItem("skiltrix_saved_videos") || "[]"
+      )
+      setSaved(savedList.includes(vidId))
+    } catch {
+      setLiked(false)
+      setSaved(false)
+    }
+
+    // 3. Record video view (once per browser session per video)
+    const sessionKey = `skiltrix_viewed_${vidId}`
+    if (!sessionStorage.getItem(sessionKey)) {
+      sessionStorage.setItem(sessionKey, "true")
+      recordVideoView(vidId)
+        .then((res) => {
+          if (res && typeof res.views === "number") {
+            setViewsCount(res.views)
+            onUpdateVideoCounts?.(vidId, { views: res.views })
+          }
+        })
+        .catch(() => {
+          setViewsCount((prev) => prev + 1)
+        })
+    }
+
+    // 4. Load comments from backend
+    void loadLiveComments(vidId)
+  }, [activeVideo?.id])
+
+  const handleToggleLike = async () => {
+    if (!activeVideo?.id) return
+    const vidId = String(activeVideo.id)
+    const nextLiked = !liked
+
+    setLiked(nextLiked)
+    if (nextLiked) setDisliked(false)
+    const optimisticLikes = Math.max(0, likesCount + (nextLiked ? 1 : -1))
+    setLikesCount(optimisticLikes)
+    onUpdateVideoCounts?.(vidId, { likes: optimisticLikes })
+
+    try {
+      const stored: string[] = JSON.parse(
+        localStorage.getItem("skiltrix_liked_videos") || "[]"
+      )
+      const updated = nextLiked
+        ? Array.from(new Set([...stored, vidId]))
+        : stored.filter((id) => id !== vidId)
+      localStorage.setItem("skiltrix_liked_videos", JSON.stringify(updated))
+    } catch {}
+
+    try {
+      const res = await likeVideo(vidId, nextLiked)
+      if (res && typeof res.like === "number") {
+        setLikesCount(res.like)
+        onUpdateVideoCounts?.(vidId, { likes: res.like })
+      }
+    } catch (err) {
+      console.warn("Failed to persist like to backend:", err)
+    }
+  }
+
+  const handleToggleDislike = async () => {
+    if (!activeVideo?.id) return
+    const vidId = String(activeVideo.id)
+    const nextDisliked = !disliked
+    setDisliked(nextDisliked)
+
+    if (nextDisliked && liked) {
+      setLiked(false)
+      const optimisticLikes = Math.max(0, likesCount - 1)
+      setLikesCount(optimisticLikes)
+      onUpdateVideoCounts?.(vidId, { likes: optimisticLikes })
+
+      try {
+        const stored: string[] = JSON.parse(
+          localStorage.getItem("skiltrix_liked_videos") || "[]"
+        )
+        localStorage.setItem(
+          "skiltrix_liked_videos",
+          JSON.stringify(stored.filter((id) => id !== vidId))
+        )
+      } catch {}
+
+      try {
+        const res = await likeVideo(vidId, false)
+        if (res && typeof res.like === "number") {
+          setLikesCount(res.like)
+          onUpdateVideoCounts?.(vidId, { likes: res.like })
+        }
+      } catch {}
+    }
+  }
+
+  const handleToggleSave = () => {
+    if (!activeVideo?.id) return
+    const vidId = String(activeVideo.id)
+    const nextSaved = !saved
+    setSaved(nextSaved)
+    try {
+      const stored: string[] = JSON.parse(
+        localStorage.getItem("skiltrix_saved_videos") || "[]"
+      )
+      const updated = nextSaved
+        ? Array.from(new Set([...stored, vidId]))
+        : stored.filter((id) => id !== vidId)
+      localStorage.setItem("skiltrix_saved_videos", JSON.stringify(updated))
+    } catch {}
+  }
+
+  const handleShare = async () => {
+    if (!activeVideo?.id) return
+    const vidId = String(activeVideo.id)
+    const shareUrl = `${window.location.origin}/videos?video_id=${encodeURIComponent(vidId)}`
+
+    // Optimistically update share count and notify backend
+    const optimisticShares = shareCount + 1
+    setShareCount(optimisticShares)
+    onUpdateVideoCounts?.(vidId, { share: optimisticShares })
+
+    recordVideoShare(vidId)
+      .then((res) => {
+        if (res && typeof res.share === "number") {
+          setShareCount(res.share)
+          onUpdateVideoCounts?.(vidId, { share: res.share })
+        }
+      })
+      .catch(() => {})
+
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: activeVideo.title,
+          text: `Watch "${activeVideo.title}" on SkilTrix`,
+          url: shareUrl,
+        })
+        setCopied(true)
+        setTimeout(() => setCopied(false), 2500)
+        return
+      } catch (err: any) {
+        if (err?.name === "AbortError") return
+      }
+    }
+
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(shareUrl)
+      } else {
+        const textArea = document.createElement("textarea")
+        textArea.value = shareUrl
+        textArea.style.position = "fixed"
+        textArea.style.opacity = "0"
+        document.body.appendChild(textArea)
+        textArea.focus()
+        textArea.select()
+        document.execCommand("copy")
+        document.body.removeChild(textArea)
+      }
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2500)
+    } catch (err) {
+      console.error("Clipboard copy failed:", err)
+    }
+  }
+
+  const loadLiveComments = async (vidId: string) => {
+    try {
+      const data = await getComments(vidId)
+      if (data && data.length > 0) {
+        setComments(
+          data.map((c) => ({
+            user: c.user_name || "Learner",
+            avatar: (c.user_name || "L").slice(0, 2).toUpperCase(),
+            time: c.created_at ? new Date(c.created_at).toLocaleDateString() : "Recently",
+            text: c.comment,
+            likes: 0,
+            color: "from-indigo-600 to-violet-600",
+          }))
+        )
+      } else {
+        setComments([])
+      }
+    } catch {
+      // Keep existing comments on network failure
+    }
+  }
+
+  const handleAddComment = async () => {
+    if (!commentText.trim() || !activeVideo?.id) return
+    const textToSubmit = commentText.trim()
+    setIsSubmittingComment(true)
+    try {
+      const created = await createComment({
+        video_id: String(activeVideo.id),
+        comment: textToSubmit,
+      })
+      setComments((prev) => [
+        {
+          user: created.user_name || "You (Learner)",
+          avatar: "YOU",
+          time: "Just now",
+          text: created.comment,
+          likes: 0,
+          color: "from-indigo-600 to-violet-600",
+        },
+        ...prev,
+      ])
+      setCommentText("")
+    } catch (err) {
+      console.error("Failed to post comment to server:", err)
+      setComments((prev) => [
+        {
+          user: "You (Learner)",
+          avatar: "YOU",
+          time: "Just now",
+          text: textToSubmit,
+          likes: 0,
+          color: "from-indigo-600 to-violet-600",
+        },
+        ...prev,
+      ])
+      setCommentText("")
+    } finally {
+      setIsSubmittingComment(false)
+    }
   }
 
   const handleLoadInCompiler = (codeSnippet?: string, lang?: string) => {
@@ -329,6 +449,8 @@ export default function InVideo({
               instructor={activeVideo.instructor}
               subtitles={activeVideo.subtitles}
               chapters={activeVideo.chapters}
+              initialDurationSec={activeVideo.duration_seconds || parseDurationToSeconds(activeVideo.duration) || 102}
+              onDurationLoaded={handleDurationLoaded}
             />
           </div>
           <div className="p-3 bg-slate-900">
@@ -366,6 +488,8 @@ export default function InVideo({
               instructor={activeVideo.instructor}
               subtitles={activeVideo.subtitles}
               chapters={activeVideo.chapters}
+              initialDurationSec={activeVideo.duration_seconds || parseDurationToSeconds(activeVideo.duration) || 102}
+              onDurationLoaded={handleDurationLoaded}
               onMiniPlayerToggle={(active) => setIsMiniPlayer(active)}
             />
           </div>
@@ -389,9 +513,9 @@ export default function InVideo({
 
             <div className="flex flex-wrap items-center justify-between gap-4 py-2 border-b border-slate-200">
               <div className="flex items-center gap-3 text-sm text-slate-500">
-                <span>{activeVideo.views} views</span>
+                <span>{formatDisplayCount(viewsCount)} views</span>
                 <span>•</span>
-                <span>{activeVideo.date}</span>
+                <span>{activeVideo.date || "Recently added"}</span>
                 <span>•</span>
                 <span className="text-emerald-600 font-medium">1080p HD Certified</span>
               </div>
@@ -399,42 +523,54 @@ export default function InVideo({
               {/* Action Buttons: Like, Share, Save */}
               <div className="flex items-center gap-2">
                 <button
-                  onClick={() => setLiked(!liked)}
-                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-semibold transition-all ${
+                  type="button"
+                  onClick={handleToggleLike}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-semibold transition-all cursor-pointer ${
                     liked
                       ? "bg-indigo-600 text-white shadow-sm"
                       : "bg-slate-100 text-slate-700 hover:bg-slate-200"
                   }`}
+                  title={liked ? "Unlike" : "Like"}
                 >
                   <ThumbsUp
                     className={`w-4 h-4 ${liked ? "fill-current" : ""}`}
                   />
-                  <span>
-                    {liked
-                      ? (parseInt(activeVideo.likes.replace("K", "")) * 1000 + 1).toLocaleString()
-                      : activeVideo.likes}
-                  </span>
+                  <span>{formatDisplayCount(likesCount)}</span>
                 </button>
-                <button className="flex items-center justify-center p-2 bg-slate-100 text-slate-600 hover:bg-slate-200 rounded-xl transition-colors">
+                <button
+                  type="button"
+                  onClick={handleToggleDislike}
+                  className={`flex items-center justify-center p-2 rounded-xl transition-colors cursor-pointer ${
+                    disliked
+                      ? "bg-slate-800 text-white"
+                      : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                  }`}
+                  title="Dislike"
+                >
                   <ThumbsDown className="w-4 h-4" />
                 </button>
                 <button
-                  onClick={() => {
-                    navigator.clipboard?.writeText(window.location.href)
-                    alert("Link copied to clipboard!")
-                  }}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-xl text-sm font-semibold transition-colors"
+                  type="button"
+                  onClick={handleShare}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-semibold transition-colors cursor-pointer ${
+                    copied
+                      ? "bg-emerald-600 text-white shadow-sm"
+                      : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                  }`}
+                  title="Share link"
                 >
-                  <Share2 className="w-4 h-4" />
-                  <span>Share</span>
+                  {copied ? <Check className="w-4 h-4" /> : <Share2 className="w-4 h-4" />}
+                  <span>{copied ? "Copied Link!" : "Share"}</span>
                 </button>
                 <button
-                  onClick={() => setSaved(!saved)}
-                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-semibold transition-all ${
+                  type="button"
+                  onClick={handleToggleSave}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-semibold transition-all cursor-pointer ${
                     saved
                       ? "bg-indigo-600 text-white shadow-sm"
                       : "bg-slate-100 text-slate-700 hover:bg-slate-200"
                   }`}
+                  title={saved ? "Saved" : "Save"}
                 >
                   <Bookmark
                     className={`w-4 h-4 ${saved ? "fill-current" : ""}`}
@@ -443,25 +579,6 @@ export default function InVideo({
                 </button>
               </div>
             </div>
-          </div>
-
-          {/* Instructor Bio Bar */}
-          <div className="flex items-center gap-3.5 py-4 px-4 bg-slate-50 border border-slate-200/80 rounded-2xl">
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 flex items-center justify-center text-white font-bold text-base shadow-sm shrink-0">
-              {activeVideo.instructor
-                .split(" ")
-                .map((n) => n[0])
-                .join("")}
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="font-bold text-slate-900 text-sm">{activeVideo.instructor}</p>
-              <p className="text-xs text-slate-500 truncate">
-                Senior Curriculum Engineer · SkilTrix Learning Labs
-              </p>
-            </div>
-            <button className="text-xs font-bold text-indigo-600 bg-white border border-indigo-200 hover:bg-indigo-50 px-4 py-2 rounded-xl transition-colors shadow-sm">
-              Follow Instructor
-            </button>
           </div>
 
           {/* Interactive Learning Tabs */}
@@ -671,6 +788,7 @@ export default function InVideo({
               </div>
               <div className="flex-1">
                 <input
+                  id="invideo-comment-input"
                   value={commentText}
                   onChange={(e) => setCommentText(e.target.value)}
                   onKeyDown={(e) => {
@@ -700,38 +818,61 @@ export default function InVideo({
 
             {/* Comments list */}
             <div className="space-y-4">
-              {comments.map((c, i) => (
-                <div
-                  key={i}
-                  className="flex items-start gap-3 p-3.5 rounded-xl hover:bg-slate-50 transition-colors border border-transparent hover:border-slate-100"
-                >
-                  <div
-                    className={`w-8 h-8 rounded-lg bg-gradient-to-br ${c.color} flex items-center justify-center text-white text-xs font-bold shrink-0 shadow-sm`}
-                  >
-                    {c.avatar}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-xs font-bold text-slate-900">
-                        {c.user}
-                      </span>
-                      <span className="text-[11px] text-slate-400">{c.time}</span>
-                    </div>
-                    <p className="text-xs text-slate-700 leading-relaxed">
-                      {c.text}
-                    </p>
-                    <div className="flex items-center gap-3 mt-2">
-                      <button className="text-xs text-slate-400 hover:text-indigo-600 flex items-center gap-1.5 transition-colors font-medium">
-                        <ThumbsUp className="w-3.5 h-3.5" />
-                        <span>{c.likes}</span>
-                      </button>
-                      <button className="text-xs text-slate-400 hover:text-slate-700 font-medium">
-                        Reply
-                      </button>
-                    </div>
-                  </div>
+              {comments.length === 0 ? (
+                <div className="text-center py-8 text-slate-400 text-xs">
+                  No comments yet. Be the first to start the discussion!
                 </div>
-              ))}
+              ) : (
+                comments.map((c, i) => (
+                  <div
+                    key={i}
+                    className="flex items-start gap-3 p-3.5 rounded-xl hover:bg-slate-50 transition-colors border border-transparent hover:border-slate-100"
+                  >
+                    <div
+                      className={`w-8 h-8 rounded-lg bg-gradient-to-br ${c.color} flex items-center justify-center text-white text-xs font-bold shrink-0 shadow-sm`}
+                    >
+                      {c.avatar}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-xs font-bold text-slate-900">
+                          {c.user}
+                        </span>
+                        <span className="text-[11px] text-slate-400">{c.time}</span>
+                      </div>
+                      <p className="text-xs text-slate-700 leading-relaxed">
+                        {c.text}
+                      </p>
+                      <div className="flex items-center gap-3 mt-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setComments((prev) =>
+                              prev.map((item, idx) =>
+                                idx === i ? { ...item, likes: item.likes + 1 } : item,
+                              ),
+                            )
+                          }}
+                          className="text-xs text-slate-400 hover:text-indigo-600 flex items-center gap-1.5 transition-colors font-medium cursor-pointer"
+                        >
+                          <ThumbsUp className="w-3.5 h-3.5" />
+                          <span>{c.likes}</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCommentText(`@${c.user} `)
+                            document.getElementById("invideo-comment-input")?.focus()
+                          }}
+                          className="text-xs text-slate-400 hover:text-slate-700 font-medium cursor-pointer"
+                        >
+                          Reply
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         </div>
@@ -755,7 +896,12 @@ export default function InVideo({
               {videos.map((v) => (
                 <button
                   key={v.id}
-                  onClick={() => onSelectVideo?.(v)}
+                  onClick={() => {
+                    window.scrollTo({ top: 0, left: 0, behavior: "instant" })
+                    if (document.documentElement) document.documentElement.scrollTop = 0
+                    if (document.body) document.body.scrollTop = 0
+                    onSelectVideo?.(v)
+                  }}
                   className={`w-full flex gap-3 text-left rounded-2xl p-2.5 transition-all group ${
                     v.id === activeVideo.id
                       ? "bg-indigo-50/80 border-2 border-indigo-500 shadow-sm"
@@ -769,7 +915,12 @@ export default function InVideo({
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300 opacity-90"
                     />
                     <div className="absolute bottom-1.5 right-1.5 bg-black/80 text-white text-[10px] px-1.5 py-0.5 rounded font-mono font-semibold">
-                      {v.duration}
+                      {v.duration && v.duration !== "—"
+                        ? v.duration
+                        : videoDurations[String(v.id)] ||
+                          (v.duration_seconds
+                            ? `${Math.floor(v.duration_seconds / 60)}:${String(v.duration_seconds % 60).padStart(2, "0")}`
+                            : "—")}
                     </div>
                     {v.id === activeVideo.id && (
                       <div className="absolute inset-0 bg-indigo-900/60 flex items-center justify-center">
@@ -791,7 +942,12 @@ export default function InVideo({
                     </p>
                     <p className="text-[11px] text-slate-500">{v.instructor}</p>
                     <div className="flex items-center gap-2 text-[11px] text-slate-400 mt-1">
-                      <span>{v.views} views</span>
+                      <span>
+                        {v.id === activeVideo.id
+                          ? formatDisplayCount(viewsCount)
+                          : formatDisplayCount(parseNumericCount(v.views))}{" "}
+                        views
+                      </span>
                       <span>•</span>
                       <span className="text-indigo-600 font-semibold">{v.tag}</span>
                     </div>

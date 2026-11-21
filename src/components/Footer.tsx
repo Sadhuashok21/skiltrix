@@ -100,9 +100,8 @@ export default function Footer() {
             <ul className="space-y-2">
               {[
                 { label: "Courses", to: "/courses" },
-                { label: "Coding Practice", to: "/practice" },
+                { label: "CodeLab IDE", to: "/codelab" },
                 { label: "Interview Prep", to: "/interview" },
-                { label: "Internships", to: "/internships" },
                 { label: "Videos", to: "/videos" },
                 { label: "Quizzes", to: "/quizzes" },
               ].map((l) => (
@@ -127,17 +126,28 @@ export default function Footer() {
               {[
                 { label: "About Us", to: "/about" },
                 { label: "Community", to: "/community" },
-                { label: "Terms of Service", to: "/terms" },
-                { label: "Privacy Policy", to: "/privacy" },
+                { label: "Terms of Service", href: "https://policies.ascentracoresolutions.com/" },
+                { label: "Privacy Policy", href: "https://policies.ascentracoresolutions.com/" },
                 { label: "Learning Dashboard", to: "/dashboard" },
               ].map((l) => (
                 <li key={l.label}>
-                  <Link
-                    to={l.to}
-                    className="text-sm text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
-                  >
-                    {l.label}
-                  </Link>
+                  {"href" in l && l.href ? (
+                    <a
+                      href={l.href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-sm text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
+                    >
+                      {l.label}
+                    </a>
+                  ) : (
+                    <Link
+                      to={l.to!}
+                      className="text-sm text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
+                    >
+                      {l.label}
+                    </Link>
+                  )}
                 </li>
               ))}
             </ul>
@@ -149,13 +159,20 @@ export default function Footer() {
             © 2026 <strong className="font-semibold text-slate-700 dark:text-slate-300">SkilTrix</strong>. Developed by <strong className="font-semibold text-slate-700 dark:text-slate-300">Ascentracore Solutions</strong>. All rights reserved.
           </p>
           <div className="flex items-center gap-4">
-            {["Twitter", "GitHub", "Discord", "LinkedIn"].map((s) => (
+            {[
+              { name: "Twitter", href: "https://x.com/ascentracore" },
+              { name: "GitHub", href: "https://github.com/ascentracoresolutions" },
+              { name: "LinkedIn", href: "https://linkedin.com/company/ascentracoresolutions" },
+              { name: "Discord", href: "https://discord.gg" },
+            ].map((s) => (
               <a
-                key={s}
-                href="#"
+                key={s.name}
+                href={s.href}
+                target="_blank"
+                rel="noopener noreferrer"
                 className="text-sm text-slate-400 dark:text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
               >
-                {s}
+                {s.name}
               </a>
             ))}
           </div>

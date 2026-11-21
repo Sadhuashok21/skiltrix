@@ -69,6 +69,10 @@ export interface WireConnection {
   toComponentId: string
   toPinId: string
   color: string
+  segmentOffset?: number
+  offsetX?: number
+  offsetY?: number
+  waypoints?: Array<{ x: number; y: number }>
 }
 
 export interface PinElectricalState {

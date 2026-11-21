@@ -23,6 +23,7 @@ import {
 } from "lucide-react"
 import type { SourceDiagnostic } from "../../api/diagnostics"
 import { diagnosticNavigationTarget } from "../../utils/diagnosticState"
+import { registerABAPLanguage } from "../../utils/abapMonarch"
 
 interface OpenTab {
   path: string
@@ -171,6 +172,8 @@ function detectMonacoLanguage(filePath: string): string {
     case "hh":
     case "hxx":
       return "cpp"
+    case "abap":
+      return "abap"
     default:
       return "plaintext"
   }
@@ -216,6 +219,7 @@ export default function MonacoEditorPanel({
   const handleEditorDidMount: OnMount = (editor, monaco) => {
     editorRef.current = editor
     monacoRef.current = monaco
+    registerABAPLanguage(monaco)
 
     // Keyboard shortcut: Ctrl+S to save
     editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {

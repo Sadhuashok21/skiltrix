@@ -236,7 +236,7 @@ export function getStreakData(): UserStreakData {
     longestStreak: 1,
     lastActiveDate: new Date().toISOString().slice(0, 10),
     activeDates: [new Date().toISOString().slice(0, 10)],
-    totalXp: 120,
+    totalXp: 0,
   }
   try {
     const raw = localStorage.getItem(LS_STREAK_KEY)

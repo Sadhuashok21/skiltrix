@@ -1,10 +1,11 @@
 import { useState } from "react"
-import { Link, useParams } from "react-router-dom"
+import { Link, useParams, useNavigate } from "react-router-dom"
 import { BookOpen, Check, Clock, Lock, Play, UserRound, ShieldCheck, CreditCard, Sparkles, AlertCircle } from "lucide-react"
 import { useSkiltrixData } from "../context/SkiltrixDataContext"
 import { enrollCourse, verifyEnrollmentPayment, cancelEnrollmentPayment } from "../api/courses"
 import { getGlobalSignInUrl } from "../api/auth"
 import { getStImageUrl } from "../utils/cdn"
+import { renderInlineMarkdown } from "../utils/markdownRenderer"
 
 declare global {
   interface Window {
@@ -14,13 +15,51 @@ declare global {
 
 export default function CourseDetail() {
   const { id } = useParams()
-  const { courses, enrollments, refresh, loading } = useSkiltrixData()
+  const navigate = useNavigate()
+  const { courses, enrollments, videos, refresh, loading } = useSkiltrixData()
   const [error, setError] = useState("")
   const [successMessage, setSuccessMessage] = useState("")
   const [enrolling, setEnrolling] = useState(false)
   const course = courses.find((item) => item.course_id === id)
   const enrollment = enrollments.find((item) => item.course.course_id === id)
-  const lessons = (course?.modules ?? []).flatMap((module) => module.lessons ?? [])
+
+  // Assigned videos fallback if explicit course modules are not defined in CMS
+  const assignedVideos = (course as any)?.videos?.length
+    ? (course as any).videos
+    : videos.filter(
+        (v) => v.course === id || v.course === course?.course_id || v.course_name?.toLowerCase() === course?.name?.toLowerCase()
+      )
+
+  const hasModuleLessons = (course?.modules ?? []).some((m) => m.lessons?.length > 0)
+  const displayModules = hasModuleLessons
+    ? course!.modules
+    : assignedVideos.length > 0
+    ? [
+        {
+          module_id: `mod_${course?.course_id || id}_videos`,
+          title: "Course Curriculum & Video Lessons",
+          description: `Video lectures and walkthroughs for ${course?.name || "this course"}`,
+          order: 1,
+          lessons: assignedVideos.map((v: any, idx: number) => {
+            const sec = v.duration_seconds || 0
+            const durMin = sec > 0 ? Math.max(1, Math.round(sec / 60)) : (v.duration_minutes || 2)
+            return {
+              lesson_id: v.video_id,
+              title: v.title,
+              lesson_type: "video",
+              duration_seconds: sec,
+              duration_minutes: durMin,
+              duration: v.duration || (sec > 0 ? `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}` : `${durMin} min`),
+              is_free_preview: !course?.is_paid || idx === 0,
+              order: idx + 1,
+              video_url: v.video_url,
+            }
+          }),
+        },
+      ]
+    : (course?.modules ?? [])
+
+  const lessons = displayModules.flatMap((module) => module.lessons ?? [])
 
   const enroll = async () => {
     if (!course) return
@@ -149,11 +188,11 @@ export default function CourseDetail() {
               </div>
               <h1 className="text-3xl font-extrabold text-slate-900 mb-4" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>{course.name}</h1>
               {course.modules?.some((module) => module.description) && (
-                <p className="text-slate-600 leading-relaxed">{course.modules.map((module) => module.description).filter(Boolean).join(" ")}</p>
+                <p className="text-slate-600 leading-relaxed">{renderInlineMarkdown(course.modules.map((module) => module.description).filter(Boolean).join(" "))}</p>
               )}
               <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-slate-500 mt-6 pt-6 border-t border-slate-100">
                 <span className="inline-flex items-center gap-2"><BookOpen className="w-4 h-4 text-indigo-600" />{lessons.length} lessons</span>
-                <span className="inline-flex items-center gap-2"><Clock className="w-4 h-4 text-indigo-600" />{lessons.reduce((minutes, lesson) => minutes + (lesson.duration_minutes || 0), 0)} minutes</span>
+                <span className="inline-flex items-center gap-2"><Clock className="w-4 h-4 text-indigo-600" />{Math.round(lessons.reduce((seconds, lesson: any) => seconds + (lesson.duration_seconds || (lesson.duration_minutes ? lesson.duration_minutes * 60 : 0)), 0) / 60)} minutes</span>
                 {course.instructor_name && <span className="inline-flex items-center gap-2"><UserRound className="w-4 h-4 text-indigo-600" />{course.instructor_name}</span>}
               </div>
             </div>
@@ -162,11 +201,11 @@ export default function CourseDetail() {
           <section className="mt-8">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-bold text-slate-900">Course Syllabus &amp; Modules</h2>
-              <span className="text-xs text-slate-400 font-medium">{course.modules?.length ?? 0} modules &bull; {lessons.length} lessons</span>
+              <span className="text-xs text-slate-400 font-medium">{displayModules.length} modules &bull; {lessons.length} lessons</span>
             </div>
-            {course.modules?.length ? (
+            {displayModules.length ? (
               <div className="space-y-4">
-                {course.modules.map((module, mIdx) => (
+                {displayModules.map((module, mIdx) => (
                   <article key={module.module_id} className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
                     <div className="p-4 bg-slate-50/50 border-b border-slate-100">
                       <div className="flex items-center justify-between gap-3">
@@ -176,21 +215,37 @@ export default function CourseDetail() {
                         </h3>
                         <span className="text-xs text-slate-400 font-medium">{module.lessons?.length ?? 0} lessons</span>
                       </div>
-                      {module.description && <p className="text-xs text-slate-500 mt-1">{module.description}</p>}
+                      {module.description && <p className="text-xs text-slate-500 mt-1">{renderInlineMarkdown(module.description)}</p>}
                     </div>
                     {module.lessons?.length ? (
                       <ul className="divide-y divide-slate-100">
-                        {module.lessons.map((lesson) => {
+                        {module.lessons.map((lesson: any) => {
                           const canAccess = enrollment || lesson.is_free_preview || !isPaid
                           return (
-                            <li key={lesson.lesson_id} className="px-4 py-3 flex items-center gap-3 text-sm hover:bg-slate-50/80 transition-colors">
+                            <li
+                              key={lesson.lesson_id}
+                              onClick={() => {
+                                if (canAccess) {
+                                  navigate(`/videos?video_id=${lesson.lesson_id}`)
+                                }
+                              }}
+                              className={`px-4 py-3 flex items-center gap-3 text-sm transition-colors ${
+                                canAccess
+                                  ? "cursor-pointer hover:bg-indigo-50/60 group"
+                                  : "opacity-80"
+                              }`}
+                            >
                               {canAccess ? (
-                                <Play className="w-4 h-4 text-emerald-500 shrink-0" />
+                                <Play className="w-4 h-4 text-emerald-500 shrink-0 group-hover:scale-110 transition-transform" />
                               ) : (
                                 <Lock className="w-4 h-4 text-slate-400 shrink-0" />
                               )}
-                              <span className={`flex-1 ${canAccess ? "text-slate-800 font-medium" : "text-slate-500"}`}>{lesson.title}</span>
-                              {lesson.duration_minutes > 0 && <span className="text-xs text-slate-400">{lesson.duration_minutes} min</span>}
+                              <span className={`flex-1 ${canAccess ? "text-slate-800 font-medium group-hover:text-indigo-600" : "text-slate-500"}`}>{lesson.title}</span>
+                              {lesson.duration ? (
+                                <span className="text-xs text-slate-400 font-mono font-medium">{lesson.duration}</span>
+                              ) : lesson.duration_minutes > 0 ? (
+                                <span className="text-xs text-slate-400">{lesson.duration_minutes} min</span>
+                              ) : null}
                               {lesson.is_free_preview && !enrollment && isPaid && (
                                 <span className="text-[10px] uppercase tracking-wide bg-indigo-50 text-indigo-700 font-semibold px-2 py-0.5 rounded">Preview</span>
                               )}

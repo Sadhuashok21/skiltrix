@@ -101,6 +101,7 @@ export interface HardwareProject {
   is_public: boolean
   status: "draft" | "configured" | "verified" | "error"
   source_files?: HardwareSourceFile[]
+  build_settings?: Record<string, any>
   pcb_project?: PcbProject
   recent_build?: HardwareBuildJob | null
   created_at: string

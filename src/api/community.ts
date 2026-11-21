@@ -30,7 +30,6 @@ export const getDiscussion = async (id: string | number) => {
 
 export const createDiscussion = async (data: {
   title: string
-
   content: string
   user_id: string
   tag?: string
@@ -38,5 +37,15 @@ export const createDiscussion = async (data: {
   language?: string
 }) => {
   const response = await api.post("/discussions/", data)
+  return response.data
+}
+
+export const replyDiscussion = async (id: string | number, data: { user_id: string; content: string }) => {
+  const response = await api.post(`/discussions/${encodeURIComponent(String(id))}/reply/`, data)
+  return response.data
+}
+
+export const likeDiscussion = async (id: string | number, data: { user_id: string }) => {
+  const response = await api.post(`/discussions/${encodeURIComponent(String(id))}/like/`, data)
   return response.data
 }

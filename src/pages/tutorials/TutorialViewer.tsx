@@ -43,6 +43,7 @@ import CourseProgressWidget from "../../components/tutorials/CourseProgressWidge
 import LessonNotesDrawer from "../../components/tutorials/LessonNotesDrawer"
 import CertificateModal from "../../components/tutorials/CertificateModal"
 import CodeBlock from "../../components/CodeBlock"
+import { renderInlineMarkdown } from "../../utils/markdownRenderer"
 
 export default function TutorialViewer() {
   const { trackSlug, lessonSlug } = useParams<{ trackSlug?: string; lessonSlug?: string }>()
@@ -103,8 +104,15 @@ export default function TutorialViewer() {
       setIsCompleted(isDone)
     }
 
-    // Scroll to top of lesson area on navigation
-    window.scrollTo({ top: 0, behavior: "smooth" })
+    // Scroll to top of lesson area immediately on navigation
+    window.scrollTo({ top: 0, left: 0, behavior: "instant" })
+    if (document.documentElement) document.documentElement.scrollTop = 0
+    if (document.body) document.body.scrollTop = 0
+    requestAnimationFrame(() => {
+      window.scrollTo(0, 0)
+      if (document.documentElement) document.documentElement.scrollTop = 0
+      if (document.body) document.body.scrollTop = 0
+    })
   }, [currentTrackId, currentLessonSlug])
 
   // Flat list of all lessons in this track for Prev/Next navigation
@@ -353,7 +361,7 @@ export default function TutorialViewer() {
         {/* ================================================================= */}
         {/* 2. CENTER COLUMN: Main Lesson Learning Area */}
         {/* ================================================================= */}
-        <main className="flex-1 min-w-0 px-4 sm:px-8 lg:px-12 py-8 max-w-4xl mx-auto">
+        <main key={currentLesson?.id || currentLessonSlug} className="flex-1 min-w-0 px-4 sm:px-8 lg:px-12 py-8 max-w-4xl mx-auto">
           {/* Lesson Header */}
           <div className="mb-8">
             <div className="flex items-center gap-2 mb-3">
@@ -371,7 +379,7 @@ export default function TutorialViewer() {
           </div>
 
           {/* Learning Objectives Box */}
-          <div className="mb-8 p-5 rounded-2xl bg-indigo-50/60 dark:bg-indigo-950/30 border border-indigo-100 dark:border-indigo-900/60 shadow-xs">
+          <div id="objectives" className="mb-8 p-5 rounded-2xl bg-indigo-50/60 dark:bg-indigo-950/30 border border-indigo-100 dark:border-indigo-900/60 shadow-xs">
             <div className="flex items-center gap-2 font-bold text-sm text-indigo-900 dark:text-indigo-200 mb-3">
               <Sparkles className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
               <span>Learning Objectives</span>
@@ -383,14 +391,14 @@ export default function TutorialViewer() {
               {currentLesson.learningObjectives.map((obj, i) => (
                 <li key={i} className="flex items-start gap-2 text-xs text-slate-700 dark:text-slate-300">
                   <Check className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 shrink-0 mt-0.5" />
-                  <span>{obj}</span>
+                  <span>{renderInlineMarkdown(obj)}</span>
                 </li>
               ))}
             </ul>
           </div>
 
           {/* Explanation Section */}
-          <section className="mb-10 prose prose-slate dark:prose-invert max-w-none">
+          <section id="explanation" className="mb-10 prose prose-slate dark:prose-invert max-w-none">
             <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 mb-3">
               Concept Explanation
             </h2>
@@ -415,7 +423,7 @@ export default function TutorialViewer() {
                   }
                   return (
                     <div key={idx} className="whitespace-pre-line space-y-2">
-                      {part}
+                      {renderInlineMarkdown(part)}
                     </div>
                   )
                 })
@@ -425,7 +433,7 @@ export default function TutorialViewer() {
 
           {/* Syntax Code Reference Block (if available) */}
           {currentLesson.syntaxCode && (
-            <section className="mb-10">
+            <section id="syntax" className="mb-10">
               <h3 className="text-sm font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-3 flex items-center gap-2">
                 <Code2 className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
                 <span>Syntax Pattern</span>
@@ -457,7 +465,7 @@ export default function TutorialViewer() {
 
                   {eg.explanation && (
                     <div className="p-3.5 bg-slate-50/50 dark:bg-slate-850 border-t border-slate-200 dark:border-slate-800 text-xs text-slate-600 dark:text-slate-400">
-                      <p>{eg.explanation}</p>
+                      <p>{renderInlineMarkdown(eg.explanation)}</p>
                     </div>
                   )}
 
@@ -473,7 +481,7 @@ export default function TutorialViewer() {
           )}
 
           {/* Embedded "Try It Yourself" Interactive Editor */}
-          <section className="mb-10">
+          <section id="try-it-yourself" className="mb-10">
             <div className="flex items-center justify-between mb-3">
               <div>
                 <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">
@@ -500,7 +508,7 @@ export default function TutorialViewer() {
           </section>
 
           {/* Interactive Lesson Quiz */}
-          <section className="mb-10">
+          <section id="quiz" className="mb-10">
             <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100 mb-3">
               Lesson Quiz
             </h2>
@@ -517,6 +525,11 @@ export default function TutorialViewer() {
             {prevLessonItem ? (
               <Link
                 to={`/tutorials/${track.id}/${prevLessonItem.lesson.slug}`}
+                onClick={() => {
+                  window.scrollTo({ top: 0, left: 0, behavior: "instant" })
+                  if (document.documentElement) document.documentElement.scrollTop = 0
+                  if (document.body) document.body.scrollTop = 0
+                }}
                 className="w-full sm:w-auto px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 text-xs font-semibold flex items-center justify-center gap-2 transition-colors"
               >
                 <ChevronLeft className="w-4 h-4" />
@@ -542,6 +555,11 @@ export default function TutorialViewer() {
             {nextLessonItem ? (
               <Link
                 to={`/tutorials/${track.id}/${nextLessonItem.lesson.slug}`}
+                onClick={() => {
+                  window.scrollTo({ top: 0, left: 0, behavior: "instant" })
+                  if (document.documentElement) document.documentElement.scrollTop = 0
+                  if (document.body) document.body.scrollTop = 0
+                }}
                 className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-slate-100 dark:hover:bg-white text-white dark:text-slate-900 text-xs font-semibold flex items-center justify-center gap-2 transition-colors"
               >
                 <span className="truncate max-w-[140px]">Next: {nextLessonItem.lesson.title}</span>

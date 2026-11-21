@@ -2,7 +2,7 @@ import { Link } from "react-router-dom"
 import { useSkiltrixData } from "../context/SkiltrixDataContext"
 import { mapCourse } from "../data/apiAdapters"
 import { TechIcon } from "../components/TechIcons"
-import { getUserLevelInfo } from "../utils/levelSystem"
+import { getUserLevelInfo, calculateDynamicStreak } from "../utils/levelSystem"
 import { getStreakData } from "../api/tutorialsApi"
 import {
   CheckCircle2,
@@ -93,12 +93,12 @@ const recommended = [
     to: "/courses/javascript-complete",
   },
   {
-    type: "Problem",
+    type: "IDE",
     icon: <Code2 className="w-5 h-5 text-indigo-600" />,
-    title: "Merge Two Sorted Lists",
-    desc: "Easy · Linked Lists",
+    title: "CodeLab Cloud IDE",
+    desc: "Interactive Multi-file Workspace",
     badge: "Popular",
-    to: "/practice",
+    to: "/codelab",
   },
   {
     type: "Quiz",
@@ -121,7 +121,7 @@ const recommended = [
 export default function Dashboard() {
   const { courses: apiCourses, problems, quizzes, videos, enrollments, badges: apiBadges, profile, progress, activity } = useSkiltrixData()
   const levelInfo = getUserLevelInfo(progress, profile)
-  const currentStreak = progress?.streak || profile?.current_streak || getStreakData().currentStreak || 1
+  const currentStreak = calculateDynamicStreak(progress, profile, activity)
   const courses = enrollments.map((item) => mapCourse(item.course, item.progress_percent))
   const earnedNames = (profile?.earned_badges as string[] | undefined) ?? []
   const badges = apiBadges.map((badge) => ({ name: String(badge.name ?? "Badge"), icon: String(badge.icon ?? "trophy"), earned: earnedNames.includes(String(badge.name)) }))
@@ -146,7 +146,7 @@ export default function Dashboard() {
   ]
   const goals = [
     { text: apiCourses[0] ? `Enroll in ${apiCourses[0].name}` : "Explore the course catalog", done: enrollments.length > 0, xp: 50, progress: enrollments.length ? "Enrolled" : undefined, to: apiCourses[0] ? `/courses/${apiCourses[0].course_id}` : "/courses" },
-    { text: "Solve a coding problem", done: Number(progress?.problems_solved ?? 0) > 0, xp: 100, to: "/practice" },
+    { text: "Build a project in CodeLab", done: Number(progress?.problems_solved ?? 0) > 0, xp: 100, to: "/codelab" },
     { text: "Pass a quiz", done: Number(progress?.quizzes_passed ?? 0) > 0, xp: 80, to: "/quizzes" },
   ]
   const completedGoals = goals.map((goal, index) => goal.done ? index : -1).filter((index) => index >= 0)
@@ -188,12 +188,6 @@ export default function Dashboard() {
             className="inline-flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 text-white font-semibold px-3.5 py-2 rounded-xl text-xs sm:text-sm transition-colors"
           >
             <span>Compilers</span>
-          </Link>
-          <Link
-            to="/practice"
-            className="inline-flex items-center gap-1.5 bg-white border border-slate-200 hover:border-indigo-300 text-slate-700 font-semibold px-3.5 py-2 rounded-xl text-xs sm:text-sm transition-colors"
-          >
-            <span>Practice</span>
           </Link>
         </div>
       </div>
@@ -518,8 +512,8 @@ export default function Dashboard() {
                   icon: <Target className="w-4 h-4 text-indigo-600" />,
                 },
                 {
-                  label: "Internship Prep",
-                  to: "/internships",
+                  label: "Career Roadmaps",
+                  to: "/roadmaps",
                   icon: <Briefcase className="w-4 h-4 text-indigo-600" />,
                 },
                 {

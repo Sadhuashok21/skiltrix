@@ -76,7 +76,10 @@ export function getPinWorldPosition(
  */
 export function computeOrthogonalWirePoints(
   p1: WorldPinPosition,
-  p2: WorldPinPosition
+  p2: WorldPinPosition,
+  segmentOffset?: number,
+  offsetX?: number,
+  offsetY?: number
 ): Array<{ x: number; y: number }> {
   const stubLen = 18
   const applyStub = (p: WorldPinPosition) => {
@@ -109,19 +112,79 @@ export function computeOrthogonalWirePoints(
   if (s1.x === s2.x || s1.y === s2.y) {
     // Straight segment
   } else if (isVertical1 && !isVertical2) {
-    // Vertical exit from p1, horizontal entry into p2 -> single corner at (s1.x, s2.y)
-    points.push({ x: s1.x, y: s2.y })
+    // Vertical exit from p1, horizontal entry into p2 (e.g. D1 to R1)
+    // midY is the horizontal segment (moves UP & DOWN)
+    // midX is the vertical segment (moves SIDE BY SIDE)
+    const midY = offsetY !== undefined
+      ? offsetY
+      : (segmentOffset !== undefined
+          ? segmentOffset
+          : (p1.leadDirection === "top" && s2.y >= s1.y
+              ? s1.y - 20
+              : (p1.leadDirection === "bottom" && s2.y <= s1.y
+                  ? s1.y + 20
+                  : s2.y)))
+    const midX = offsetX !== undefined ? offsetX : Math.round((s1.x + s2.x) / 2)
+
+    if (midY !== s2.y && midX !== s1.x) {
+      points.push({ x: s1.x, y: midY })
+      points.push({ x: midX, y: midY })
+      points.push({ x: midX, y: s2.y })
+    } else if (midY !== s2.y) {
+      points.push({ x: s1.x, y: midY })
+      points.push({ x: s2.x, y: midY })
+    } else {
+      points.push({ x: s1.x, y: s2.y })
+    }
   } else if (!isVertical1 && isVertical2) {
-    // Horizontal exit from p1, vertical entry into p2 -> single corner at (s2.x, s1.y)
-    points.push({ x: s2.x, y: s1.y })
+    // Horizontal exit from p1, vertical entry into p2 (e.g. R1 to Uno D13)
+    // midX is the vertical segment (moves SIDE BY SIDE)
+    // midY is the horizontal segment (moves UP & DOWN)
+    const midX = offsetX !== undefined
+      ? offsetX
+      : (segmentOffset !== undefined
+          ? segmentOffset
+          : (p1.leadDirection === "left" && s2.x >= s1.x
+              ? s1.x - 20
+              : (p1.leadDirection === "right" && s2.x <= s1.x
+                  ? s1.x + 20
+                  : s2.x)))
+    const midY = offsetY !== undefined ? offsetY : Math.round((s1.y + s2.y) / 2)
+
+    if (midX !== s2.x && midY !== s1.y) {
+      points.push({ x: midX, y: s1.y })
+      points.push({ x: midX, y: midY })
+      points.push({ x: s2.x, y: midY })
+    } else if (midX !== s2.x) {
+      points.push({ x: midX, y: s1.y })
+      points.push({ x: midX, y: s2.y })
+    } else {
+      points.push({ x: s2.x, y: s1.y })
+    }
   } else if (isVertical1 && isVertical2) {
-    const midY = Math.round((s1.y + s2.y) / 2)
-    points.push({ x: s1.x, y: midY })
-    points.push({ x: s2.x, y: midY })
+    // Both vertical: middle segment is horizontal at midY (moves UP & DOWN)
+    const midY = offsetY !== undefined ? offsetY : (segmentOffset !== undefined ? segmentOffset : Math.round((s1.y + s2.y) / 2))
+    if (offsetX !== undefined && offsetX !== Math.round((s1.x + s2.x) / 2)) {
+      points.push({ x: s1.x, y: midY })
+      points.push({ x: offsetX, y: midY })
+      points.push({ x: offsetX, y: s2.y })
+      points.push({ x: s2.x, y: s2.y })
+    } else {
+      points.push({ x: s1.x, y: midY })
+      points.push({ x: s2.x, y: midY })
+    }
   } else {
-    const midX = Math.round((s1.x + s2.x) / 2)
-    points.push({ x: midX, y: s1.y })
-    points.push({ x: midX, y: s2.y })
+    // Both horizontal: middle segment is vertical at midX (moves SIDE BY SIDE)
+    const midX = offsetX !== undefined ? offsetX : (segmentOffset !== undefined ? segmentOffset : Math.round((s1.x + s2.x) / 2))
+    if (offsetY !== undefined && offsetY !== Math.round((s1.y + s2.y) / 2)) {
+      points.push({ x: midX, y: s1.y })
+      points.push({ x: midX, y: offsetY })
+      points.push({ x: s2.x, y: offsetY })
+      points.push({ x: s2.x, y: s2.y })
+    } else {
+      points.push({ x: midX, y: s1.y })
+      points.push({ x: midX, y: s2.y })
+    }
   }
 
   if (s2.x !== p2.x || s2.y !== p2.y) {

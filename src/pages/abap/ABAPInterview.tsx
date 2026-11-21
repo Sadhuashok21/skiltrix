@@ -1,5 +1,6 @@
 import React, { useState } from "react"
 import { Link } from "react-router-dom"
+import CodeBlock from "../../components/CodeBlock"
 import {
   HelpCircle,
   ChevronDown,
@@ -13,6 +14,7 @@ import {
   Code2,
   ExternalLink,
 } from "lucide-react"
+import { renderInlineMarkdown } from "../../utils/markdownRenderer"
 
 interface InterviewQA {
   id: string
@@ -254,7 +256,7 @@ export default function ABAPInterview() {
                       </span>
                     </div>
                     <h3 className="text-base sm:text-lg font-bold text-slate-900 pt-1">
-                      {qa.question}
+                      {renderInlineMarkdown(qa.question)}
                     </h3>
                   </div>
                   <div className="w-8 h-8 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center shrink-0 mt-1">
@@ -265,18 +267,17 @@ export default function ABAPInterview() {
                 {isOpen && (
                   <div className="px-5 sm:px-6 pb-6 pt-2 border-t border-slate-100 space-y-4">
                     <div className="text-xs sm:text-sm text-slate-700 whitespace-pre-line leading-relaxed">
-                      {qa.answer}
+                      {renderInlineMarkdown(qa.answer)}
                     </div>
 
                     {qa.codeSnippet && (
                       <div className="mt-3">
-                        <div className="bg-slate-900 text-slate-400 px-3 py-1.5 rounded-t-lg text-[11px] font-mono flex items-center gap-2">
-                          <Code2 className="w-3.5 h-3.5 text-indigo-400" />
-                          <span>Code Example</span>
-                        </div>
-                        <pre className="bg-slate-950 text-indigo-100 p-4 rounded-b-lg font-mono text-xs overflow-x-auto leading-relaxed border border-slate-800">
-                          <code>{qa.codeSnippet}</code>
-                        </pre>
+                        <CodeBlock
+                          code={qa.codeSnippet}
+                          language="abap"
+                          filename={`${qa.id}.abap`}
+                          maxHeight="320px"
+                        />
                       </div>
                     )}
                   </div>

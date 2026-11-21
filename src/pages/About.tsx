@@ -15,28 +15,16 @@ import logoImg from "../assets/logo.png"
 
 const team = [
   {
-    name: "Maya Chen",
-    role: "Head of Curriculum",
-    avatar: "MC",
+    name: "Sadhu Ashok Kumar",
+    role: "Founder & Lead Architect",
+    avatar: "SA",
     color: "from-blue-500 to-indigo-500",
   },
   {
-    name: "James Okafor",
-    role: "Lead Engineer",
-    avatar: "JO",
+    name: "Venkata Sandeep",
+    role: "Co-Founder & Lead Engineer",
+    avatar: "VS",
     color: "from-emerald-500 to-teal-500",
-  },
-  {
-    name: "Priya Nair",
-    role: "Learning Designer",
-    avatar: "PN",
-    color: "from-pink-500 to-rose-500",
-  },
-  {
-    name: "Sam Torres",
-    role: "Community Lead",
-    avatar: "ST",
-    color: "from-amber-500 to-orange-500",
   },
 ]
 
@@ -236,24 +224,24 @@ export default function About() {
         >
           The Team Behind SkilTrix
         </h2>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid sm:grid-cols-2 max-w-2xl mx-auto gap-6">
           {team.map((m) => (
             <div
               key={m.name}
-              className="bg-white rounded-xl border border-slate-200 p-5 text-center"
+              className="bg-white rounded-xl border border-slate-200 p-6 text-center hover:border-indigo-200 hover:shadow-md transition-all"
             >
               <div
-                className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${m.color} flex items-center justify-center text-white text-xl font-bold mx-auto mb-3`}
+                className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${m.color} flex items-center justify-center text-white text-xl font-bold mx-auto mb-3 shadow-sm`}
               >
                 {m.avatar}
               </div>
               <h3
-                className="font-bold text-slate-900"
+                className="font-bold text-slate-900 text-lg"
                 style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}
               >
                 {m.name}
               </h3>
-              <p className="text-sm text-slate-500 mt-0.5">{m.role}</p>
+              <p className="text-sm font-medium text-slate-500 mt-1">{m.role}</p>
             </div>
           ))}
         </div>

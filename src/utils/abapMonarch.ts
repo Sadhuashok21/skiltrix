@@ -236,6 +236,7 @@ export const registerABAPLanguage = (monaco: Monaco) => {
       "sy-subrc",
       "sy-datum",
       "sy-uzeit",
+      "sy-host",
       "sy-index",
       "sy-tabix",
       "sy-mandt",
@@ -245,11 +246,29 @@ export const registerABAPLanguage = (monaco: Monaco) => {
       "sy-title",
       "sy-pagno",
       "sy-linno",
+      "sy-fdpos",
+      "sy-tfill",
+      "sy-dynnr",
+      "sy-repid",
+      "sy-cprog",
+      "sy-msgid",
+      "sy-msgno",
+      "sy-msgty",
+      "sy-msgv1",
+      "sy-msgv2",
+      "sy-msgv3",
+      "sy-msgv4",
     ],
 
     tokenizer: {
       root: [
-        // System variables
+        // Full line comment starting with * at column 0
+        [/^\*.*$/, "comment"],
+
+        // Inline comment starting with "
+        [/".*$/, "comment"],
+
+        // System variables (e.g. sy-datum, sy-subrc, sy-uzeit, sy-host)
         [
           /sy-[a-zA-Z0-9_]+/i,
           {
@@ -259,6 +278,17 @@ export const registerABAPLanguage = (monaco: Monaco) => {
             },
           },
         ],
+
+        // Strings: ABAP single quote ('text' with '' escape), backtick (`text`), and pipe string template (|text|)
+        [/'(?:''|[^'\n\r])*'/, "string"],
+        [/`(?:``|[^`\n\r])*`/, "string"],
+        [/\|(?:\\\||[^\|\n\r])*\|/, "string.template"],
+
+        // Field Symbols (<fs_name>)
+        [/<[a-zA-Z0-9_]+>/, "variable.predefined"],
+
+        // Operators: ->, =>, &&, =, <>, <=, >=, +, -, *, /, etc.
+        [/->\*|->|=>|&&|<>|<=|>=|:=|=|<|>|\+|-|\*|\//, "operator"],
 
         // Identifiers and keywords
         [
@@ -273,23 +303,12 @@ export const registerABAPLanguage = (monaco: Monaco) => {
           },
         ],
 
-        // Full line comment starting with * at column 0
-        [/^\*.*$/, "comment"],
-
-        // Inline comment starting with "
-        [/".*$/, "comment"],
-
-        // Strings
-        [/'[^\\']*'/, "string"],
-        [/`[^\\`]*`/, "string"],
-        [/\|[^\\|]*\|/, "string.template"],
-
         // Numbers
         [/\d+\.\d+/, "number.float"],
         [/\d+/, "number"],
 
         // Delimiters
-        [/[;,.]/, "delimiter"],
+        [/[;,.:@]/, "delimiter"],
         [/[()\[\]]/, "@brackets"],
       ],
     },
@@ -605,6 +624,33 @@ export const registerABAPLanguage = (monaco: Monaco) => {
       "editor.lineHighlightBackground": "#132845",
       "editorCursor.foreground": "#3da5ff",
       "editor.selectionBackground": "#1e4976",
+    },
+  })
+
+  monaco.editor.defineTheme("codelab-dark", {
+    base: "vs-dark",
+    inherit: true,
+    rules: [
+      { token: "keyword", foreground: "569cd6", fontStyle: "bold" },
+      { token: "type", foreground: "4ec9b0" },
+      { token: "variable.predefined", foreground: "4fc1ff", fontStyle: "bold" },
+      { token: "string", foreground: "ce9178" },
+      { token: "string.template", foreground: "d7ba7d" },
+      { token: "comment", foreground: "6a9955", fontStyle: "italic" },
+      { token: "number", foreground: "b5cea8" },
+      { token: "operator", foreground: "d4d4d4" },
+      { token: "identifier", foreground: "9cdcfe" },
+      { token: "delimiter", foreground: "d4d4d4" },
+    ],
+    colors: {
+      "editor.background": "#020617",
+      "editor.foreground": "#e2e8f0",
+      "editorLineNumber.foreground": "#475569",
+      "editorLineNumber.activeForeground": "#818cf8",
+      "editor.lineHighlightBackground": "#0f172a60",
+      "editorCursor.foreground": "#6366f1",
+      "editor.selectionBackground": "#312e8160",
+      "editorGutter.background": "#020617",
     },
   })
 

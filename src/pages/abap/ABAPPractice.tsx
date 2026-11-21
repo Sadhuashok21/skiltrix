@@ -1,5 +1,6 @@
 import React, { useState } from "react"
 import { Link } from "react-router-dom"
+import CodeBlock from "../../components/CodeBlock"
 import {
   Code2,
   Terminal,
@@ -447,62 +448,40 @@ export default function ABAPPractice() {
               </div>
 
               {/* Code Editor Header & Switcher */}
-              <div className="mt-6">
-                <div className="flex items-center justify-between bg-slate-900 text-slate-300 px-4 py-2 rounded-t-xl text-xs font-mono">
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => setActiveTab("starter")}
-                      className={`px-2.5 py-1 rounded font-semibold transition-colors ${
-                        activeTab === "starter"
-                          ? "bg-indigo-600 text-white"
-                          : "text-slate-400 hover:text-white"
-                      }`}
-                    >
-                      Starter Code
-                    </button>
-                    <button
-                      onClick={() => setActiveTab("solution")}
-                      className={`px-2.5 py-1 rounded font-semibold transition-colors ${
-                        activeTab === "solution"
-                          ? "bg-emerald-600 text-white"
-                          : "text-slate-400 hover:text-white"
-                      }`}
-                    >
-                      View Solution
-                    </button>
-                  </div>
-
+              <div className="mt-6 space-y-3">
+                <div className="flex items-center gap-2">
                   <button
-                    onClick={() =>
-                      handleCopyCode(
-                        activeTab === "starter"
-                          ? selectedProblem.starterCode
-                          : selectedProblem.solutionCode
-                      )
-                    }
-                    className="inline-flex items-center gap-1 text-[11px] text-slate-400 hover:text-white"
+                    onClick={() => setActiveTab("starter")}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                      activeTab === "starter"
+                        ? "bg-indigo-600 text-white shadow-sm"
+                        : "bg-slate-800 text-slate-400 hover:text-white"
+                    }`}
                   >
-                    {copied ? (
-                      <>
-                        <Check className="w-3.5 h-3.5 text-emerald-400" />
-                        <span>Copied</span>
-                      </>
-                    ) : (
-                      <>
-                        <Copy className="w-3.5 h-3.5" />
-                        <span>Copy</span>
-                      </>
-                    )}
+                    Starter Code
+                  </button>
+                  <button
+                    onClick={() => setActiveTab("solution")}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+                      activeTab === "solution"
+                        ? "bg-emerald-600 text-white shadow-sm"
+                        : "bg-slate-800 text-slate-400 hover:text-white"
+                    }`}
+                  >
+                    View Solution
                   </button>
                 </div>
 
-                <pre className="bg-slate-950 text-indigo-100 p-4 rounded-b-xl font-mono text-xs overflow-x-auto leading-relaxed border-x border-b border-slate-800">
-                  <code>
-                    {activeTab === "starter"
+                <CodeBlock
+                  code={
+                    activeTab === "starter"
                       ? selectedProblem.starterCode
-                      : selectedProblem.solutionCode}
-                  </code>
-                </pre>
+                      : selectedProblem.solutionCode
+                  }
+                  language="abap"
+                  filename={`${selectedProblem.id}_${activeTab}.abap`}
+                  maxHeight="480px"
+                />
               </div>
             </div>
           </div>

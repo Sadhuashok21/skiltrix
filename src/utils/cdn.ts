@@ -51,7 +51,7 @@ export function getStPdfUrl(filename?: string, fallback = ""): string {
   return `${SKILTRIX_CDN.pdfs}/${clean}`;
 }
 
-export function getSfsImageUrl(filename?: string, fallback = "/placeholder-bp.webp"): string {
+export function getSfsImageUrl(filename?: string, fallback = ""): string {
   if (!filename) return fallback;
   if (/^https?:\/\//i.test(filename)) return filename;
   const clean = filename.replace(/^\/+/, "");

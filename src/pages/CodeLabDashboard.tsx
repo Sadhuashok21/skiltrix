@@ -27,6 +27,7 @@ import {
   exportProjectZipUrl,
   type ApiProject,
 } from "../api/codelab"
+import { getApiErrorMessage } from "../api/client"
 import { getAssessments, type ApiAssessment } from "../api/practice"
 import { TechIcon } from "../components/TechIcons"
 
@@ -156,7 +157,7 @@ export default function CodeLabDashboard() {
       setNewTitle("")
       navigate(`/codelab/project/${created.project_id}`)
     } catch (err: any) {
-      alert(`Could not create project: ${err.message}`)
+      alert(`Could not create project: ${getApiErrorMessage(err)}`)
     } finally {
       setIsCreating(false)
     }
@@ -170,7 +171,7 @@ export default function CodeLabDashboard() {
       await deleteProject(projectId)
       setProjects((prev) => prev.filter((p) => p.project_id !== projectId))
     } catch (err: any) {
-      alert(`Failed to delete: ${err.message}`)
+      alert(`Failed to delete: ${getApiErrorMessage(err)}`)
     }
   }
 
