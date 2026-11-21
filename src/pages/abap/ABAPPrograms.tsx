@@ -1,5 +1,6 @@
 import React, { useState } from "react"
 import { Link } from "react-router-dom"
+import CodeBlock from "../../components/CodeBlock"
 import {
   FileCode,
   Terminal,
@@ -460,18 +461,14 @@ export default function ABAPPrograms() {
                 </div>
               </div>
 
-              {/* Code Box */}
+              {/* Code Box with Syntax Highlighting */}
               <div className="mt-5">
-                <div className="bg-slate-900 text-slate-300 px-4 py-2.5 rounded-t-xl border border-slate-800 text-xs font-mono flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <FileCode className="w-4 h-4 text-sky-400" />
-                    <span>{selectedProg.id}.abap</span>
-                  </div>
-                  <span className="text-[11px] text-slate-400">SAP ABAP 7.40+</span>
-                </div>
-                <pre className="bg-slate-950 text-indigo-100 p-4 rounded-b-xl border-x border-b border-slate-800 font-mono text-xs overflow-x-auto leading-relaxed">
-                  <code>{selectedProg.code}</code>
-                </pre>
+                <CodeBlock
+                  code={selectedProg.code}
+                  language="abap"
+                  filename={`${selectedProg.id}.abap`}
+                  maxHeight="520px"
+                />
               </div>
             </div>
           </div>

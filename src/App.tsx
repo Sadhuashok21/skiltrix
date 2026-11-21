@@ -1,11 +1,38 @@
 import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from "react"
-import { BrowserRouter, Routes, Route, Navigate, useNavigate, useSearchParams, useParams } from "react-router-dom"
+import { BrowserRouter, Routes, Route, Navigate, useNavigate, useSearchParams, useParams, useLocation } from "react-router-dom"
 import Layout from "./components/Layout"
 import { SkiltrixDataProvider } from "./context/SkiltrixDataContext"
 import { ThemeProvider } from "./context/ThemeContext"
 import { getGlobalSignInUrl } from "./api/auth"
 import api from "./api/client"
 import { AuthProvider, AuthCallback, initiateLogin } from "./auth"
+
+// Global scroll to top on every route change
+function ScrollToTop() {
+  const { pathname, search } = useLocation()
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: "instant" })
+    if (document.documentElement) document.documentElement.scrollTop = 0
+    if (document.body) document.body.scrollTop = 0
+    const raf = requestAnimationFrame(() => {
+      window.scrollTo(0, 0)
+      if (document.documentElement) document.documentElement.scrollTop = 0
+      if (document.body) document.body.scrollTop = 0
+    })
+    return () => cancelAnimationFrame(raf)
+  }, [pathname, search])
+
+  return null
+}
+
+// Policy redirect component
+const PolicyRedirect = () => {
+  useEffect(() => {
+    window.location.replace("https://policies.ascentracoresolutions.com/")
+  }, [])
+  return null
+}
 
 // ── Lazy-loaded pages (code-split per route) ────────────────────────────────
 const Home             = lazy(() => import("./pages/Home"))
@@ -51,6 +78,7 @@ const HardwareDashboard    = lazy(() => import("./pages/hardware/HardwareDashboa
 const FirmwareIDE          = lazy(() => import("./pages/hardware/FirmwareIDE"))
 const PcbWorkspace         = lazy(() => import("./pages/hardware/PcbWorkspace"))
 const CircuitSimulator     = lazy(() => import("./pages/hardware/CircuitSimulator"))
+const DynamicCoursePageResolver = lazy(() => import("./components/cms/DynamicCoursePageResolver"))
 
 
 // ── Page-level loading skeleton ─────────────────────────────────────────────
@@ -241,6 +269,7 @@ export default function App() {
   return (
     <ThemeProvider>
       <BrowserRouter>
+        <ScrollToTop />
         <AuthProvider config={{ clientId: "skiltrix" }}>
           <SkiltrixDataProvider>
           <Suspense fallback={<PageLoader />}>
@@ -320,20 +349,24 @@ export default function App() {
             <Route path="/dashboard"   element={<Layout><Dashboard /></Layout>} />
 
             <Route path="/courses"     element={<Layout><Courses /></Layout>} />
+            <Route path="/courses/:courseSlug/*" element={<DynamicCoursePageResolver />} />
             <Route path="/courses/:id" element={<Layout><CourseDetail /></Layout>} />
-            <Route path="/practice"    element={<Layout noFooter><Practice /></Layout>} />
+            {/* Practice section hidden - redirects to Compilers hub */}
+            <Route path="/practice"    element={<Navigate to="/compilers" replace />} />
             <Route path="/videos"      element={<Layout><Videos /></Layout>} />
             <Route path="/quizzes"     element={<Layout><Quizzes /></Layout>} />
             <Route path="/progress"    element={<Layout><Progress /></Layout>} />
             <Route path="/community"   element={<Layout><Community /></Layout>} />
-            <Route path="/internships" element={<Layout><Internships /></Layout>} />
-            <Route path="/internships/:company" element={<Layout><Internships /></Layout>} />
+            {/* Internships section hidden - redirects to Interview */}
+            <Route path="/internships" element={<Navigate to="/interview" replace />} />
+            <Route path="/internships/:company" element={<Navigate to="/interview" replace />} />
             <Route path="/interview"   element={<Layout><Interview /></Layout>} />
             <Route path="/profile"     element={<Layout><Profile /></Layout>} />
             <Route path="/notifications" element={<Layout><Notifications /></Layout>} />
             <Route path="/about"       element={<Layout><About /></Layout>} />
-            <Route path="/terms"       element={<Layout><Terms /></Layout>} />
-            <Route path="/privacy"     element={<Layout><PrivacyPolicy /></Layout>} />
+            <Route path="/terms"       element={<PolicyRedirect />} />
+            <Route path="/privacy"     element={<PolicyRedirect />} />
+            <Route path="/privacy-policy" element={<PolicyRedirect />} />
 
             {/* Flagship ABAP Hub & SEO Pages under /compilers/ */}
             <Route path="/compilers/abap-oops" element={<Layout><ABAPOOPSGuide /></Layout>} />

@@ -16,6 +16,7 @@ import {
 } from "lucide-react"
 import CodeEditor from "../CodeEditor"
 import { executeTutorialCode } from "../../api/tutorialsApi"
+import { renderInlineMarkdown } from "../../utils/markdownRenderer"
 
 interface TryItYourselfEditorProps {
   initialCode: string
@@ -151,7 +152,7 @@ export default function TryItYourselfEditor({
               </span>
             </h4>
             {taskDescription && (
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 line-clamp-1">{taskDescription}</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 line-clamp-1">{renderInlineMarkdown(taskDescription)}</p>
             )}
           </div>
         </div>
@@ -239,7 +240,7 @@ export default function TryItYourselfEditor({
           <Lightbulb className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
           <ul className="list-disc pl-4 space-y-1">
             {hints.map((h, i) => (
-              <li key={i}>{h}</li>
+              <li key={i}>{renderInlineMarkdown(h)}</li>
             ))}
           </ul>
         </div>

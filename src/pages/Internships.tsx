@@ -127,43 +127,7 @@ export default function Internships() {
               </div>
             </div>
 
-            {/* Practice problems */}
-            <div className="bg-white rounded-xl border border-slate-200 p-5">
-              <h2
-                className="font-bold text-slate-900 mb-4"
-                style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}
-              >
-                Recommended Practice Problems
-              </h2>
-              <div className="space-y-3">
-                {apiProblems.slice(0, 5).map((p) => (
-                  <Link
-                    to="/practice"
-                    key={p.problem_id}
-                    className="flex items-center gap-4 p-3.5 rounded-lg border border-slate-100 hover:border-indigo-200 hover:bg-indigo-50/20 transition-all"
-                  >
-                    <span
-                      className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
-                        p.difficulty === "Easy"
-                          ? "bg-green-100 text-green-700"
-                          : p.difficulty === "Medium"
-                            ? "bg-amber-100 text-amber-700"
-                            : "bg-red-100 text-red-700"
-                      }`}
-                    >
-                      {p.difficulty}
-                    </span>
-                    <span className="flex-1 text-sm font-semibold text-slate-900">
-                      {p.title}
-                    </span>
-                    <span className="text-xs text-slate-400">{Array.isArray(p.topics) ? p.topics.join(", ") : p.topics}</span>
-                    <span className="text-xs text-indigo-600 font-medium">
-                      Solve →
-                    </span>
-                  </Link>
-                ))}
-              </div>
-            </div>
+            {/* Recommended Practice Problems section hidden per user preference */}
           </div>
 
           {/* Sidebar */}
@@ -281,44 +245,52 @@ export default function Internships() {
             title: "Master the Fundamentals",
             desc: "Python or Java, OOP, basic data structures",
             icon: BookOpen,
+            to: "/courses",
           },
           {
             step: 2,
-            title: "Practice DSA",
-            desc: "200+ problems across difficulty levels",
+            title: "Hands-on CodeLab",
+            desc: "Browser-based full development IDE",
             icon: Binary,
+            to: "/codelab",
           },
           {
             step: 3,
             title: "Prepare for Assessments",
             desc: "Company-style OA practice and timing",
             icon: Terminal,
+            to: "/placement-preparation",
           },
           {
             step: 4,
             title: "Ace the Interview",
             desc: "Technical + behavioral preparation",
             icon: Target,
+            to: "/interview",
           },
         ].map((s) => (
-          <div
+          <Link
             key={s.step}
-            className="bg-white rounded-xl border border-slate-200 p-5"
+            to={s.to}
+            className="group bg-white rounded-xl border border-slate-200 hover:border-indigo-300 hover:shadow-md transition-all p-5 block"
           >
-            <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-bold text-sm mb-4">
+            <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-bold text-sm mb-4 group-hover:scale-105 transition-transform">
               {s.step}
             </div>
-            <div className="w-9 h-9 rounded-lg bg-indigo-50 border border-indigo-100 flex items-center justify-center mb-3 text-indigo-600">
+            <div className="w-9 h-9 rounded-lg bg-indigo-50 border border-indigo-100 flex items-center justify-center mb-3 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
               <s.icon className="w-5 h-5" />
             </div>
             <h3
-              className="font-bold text-slate-900 text-sm mb-1"
+              className="font-bold text-slate-900 group-hover:text-indigo-600 transition-colors text-sm mb-1"
               style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}
             >
               {s.title}
             </h3>
             <p className="text-xs text-slate-500">{s.desc}</p>
-          </div>
+            <span className="text-xs font-semibold text-indigo-600 mt-3 inline-flex items-center gap-1 group-hover:translate-x-1 transition-transform">
+              Explore step →
+            </span>
+          </Link>
         ))}
       </div>
 

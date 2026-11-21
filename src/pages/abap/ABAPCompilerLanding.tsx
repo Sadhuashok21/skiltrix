@@ -1,5 +1,8 @@
-import React, { useState } from "react"
+import React, { useState, useRef, useEffect } from "react"
 import { Link } from "react-router-dom"
+import Editor, { OnMount, type Monaco } from "@monaco-editor/react"
+import { registerABAPLanguage } from "../../utils/abapMonarch"
+import { executeABAP } from "../../api/abap"
 import {
   Terminal,
   Play,
@@ -180,21 +183,58 @@ export default function ABAPCompilerLanding() {
   const [selectedTemplate, setSelectedTemplate] = useState<ABAPTemplate>(TEMPLATES[0])
   const [activeCode, setActiveCode] = useState<string>(TEMPLATES[0].code)
   const [activeOutput, setActiveOutput] = useState<string>(TEMPLATES[0].output)
+  const [sySubrc, setSySubrc] = useState<number>(0)
   const [copied, setCopied] = useState(false)
   const [isRunning, setIsRunning] = useState(false)
+
+  const editorRef = useRef<any>(null)
+  const monacoRef = useRef<Monaco | null>(null)
+  const activeCodeRef = useRef<string>(activeCode)
+
+  useEffect(() => {
+    activeCodeRef.current = activeCode
+  }, [activeCode])
 
   const handleSelectTemplate = (t: ABAPTemplate) => {
     setSelectedTemplate(t)
     setActiveCode(t.code)
     setActiveOutput(t.output)
+    setSySubrc(0)
   }
 
-  const handleRunCode = () => {
+  const handleRunCode = async () => {
     setIsRunning(true)
-    setTimeout(() => {
-      setIsRunning(false)
+    try {
+      const codeToRun = activeCodeRef.current || activeCode
+      const result = await executeABAP({
+        code: codeToRun,
+        execution_mode: "simulator",
+      })
+      if (result && typeof result.output === "string") {
+        setActiveOutput(result.output || "(Program completed with no WRITE output)")
+        setSySubrc(typeof result.sy_subrc === "number" ? result.sy_subrc : 0)
+      } else {
+        setActiveOutput(selectedTemplate.output)
+        setSySubrc(0)
+      }
+    } catch {
       setActiveOutput(selectedTemplate.output)
-    }, 450)
+      setSySubrc(0)
+    } finally {
+      setIsRunning(false)
+    }
+  }
+
+  const handleEditorDidMount: OnMount = (editor, monaco) => {
+    editorRef.current = editor
+    monacoRef.current = monaco
+    registerABAPLanguage(monaco)
+    monaco.editor.setTheme("codelab-dark")
+
+    // Keyboard shortcut: Ctrl+Enter to run
+    editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => {
+      handleRunCode()
+    })
   }
 
   const handleCopy = () => {
@@ -343,40 +383,68 @@ export default function ABAPCompilerLanding() {
           </div>
 
           {/* Playground Code & Output Grid */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 divide-y lg:divide-y-0 lg:divide-x divide-slate-800 bg-slate-950 min-h-[420px]">
+          <div className="grid grid-cols-1 lg:grid-cols-12 divide-y lg:divide-y-0 lg:divide-x divide-slate-800 bg-slate-950 min-h-[480px]">
             {/* Code Editor Pane */}
-            <div className="lg:col-span-7 flex flex-col">
-              <div className="bg-slate-900/80 px-4 py-2 border-b border-slate-800/80 flex items-center justify-between text-xs text-slate-400 font-mono">
+            <div className="lg:col-span-7 flex flex-col h-[460px] sm:h-[490px]">
+              <div className="bg-slate-900/80 px-4 py-2 border-b border-slate-800/80 flex items-center justify-between text-xs text-slate-400 font-mono shrink-0">
                 <div className="flex items-center gap-2">
                   <div className="w-2.5 h-2.5 rounded-full bg-red-500" />
                   <div className="w-2.5 h-2.5 rounded-full bg-yellow-500" />
                   <div className="w-2.5 h-2.5 rounded-full bg-green-500" />
-                  <span className="ml-2 text-slate-300">source.abap</span>
+                  <span className="ml-2 text-slate-300 font-semibold">source.abap</span>
                 </div>
-                <span>ABAP 7.50</span>
+                <div className="flex items-center gap-3">
+                  <span className="text-[11px] text-slate-500 hidden sm:inline">Ctrl+Enter to run</span>
+                  <span className="px-2 py-0.5 rounded text-[11px] font-medium bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+                    ABAP 7.50
+                  </span>
+                </div>
               </div>
-              <textarea
-                value={activeCode}
-                onChange={(e) => setActiveCode(e.target.value)}
-                className="w-full flex-1 bg-slate-950 text-indigo-100 p-4 font-mono text-xs leading-relaxed outline-none resize-none selection:bg-indigo-600 selection:text-white"
-                spellCheck={false}
-              />
+              <div className="flex-1 w-full min-h-0 relative overflow-hidden bg-[#020617]">
+                <Editor
+                  height="100%"
+                  width="100%"
+                  language="abap"
+                  value={activeCode}
+                  theme="codelab-dark"
+                  onChange={(val) => setActiveCode(val ?? "")}
+                  onMount={handleEditorDidMount}
+                  options={{
+                    fontSize: 13,
+                    fontFamily: "'Fira Code', 'Cascadia Code', Consolas, 'Courier New', monospace",
+                    fontLigatures: true,
+                    tabSize: 2,
+                    automaticLayout: true,
+                    minimap: { enabled: false },
+                    scrollBeyondLastLine: false,
+                    lineNumbers: "on",
+                    renderLineHighlight: "all",
+                    bracketPairColorization: { enabled: true },
+                    cursorBlinking: "smooth",
+                    folding: true,
+                    wordWrap: "on",
+                    padding: { top: 12, bottom: 12 },
+                  }}
+                />
+              </div>
             </div>
 
             {/* Output Console Pane */}
-            <div className="lg:col-span-5 flex flex-col bg-slate-900/60">
-              <div className="bg-slate-900/80 px-4 py-2 border-b border-slate-800/80 flex items-center justify-between text-xs text-slate-400 font-mono">
+            <div className="lg:col-span-5 flex flex-col bg-slate-900/60 h-[460px] sm:h-[490px] overflow-hidden">
+              <div className="bg-slate-900/80 px-4 py-2 border-b border-slate-800/80 flex items-center justify-between text-xs text-slate-400 font-mono shrink-0">
                 <div className="flex items-center gap-2">
                   <Terminal className="w-3.5 h-3.5 text-emerald-400" />
-                  <span className="text-slate-300">Standard List Output (WRITE:)</span>
+                  <span className="text-slate-300 font-semibold">Standard List Output (WRITE:)</span>
                 </div>
-                <span className="text-emerald-400 text-[11px] font-semibold">SY-SUBRC = 0</span>
+                <span className="text-emerald-400 text-[11px] font-mono font-semibold">
+                  SY-SUBRC = {sySubrc}
+                </span>
               </div>
-              <div className="p-4 flex-1 font-mono text-xs text-slate-200 whitespace-pre-wrap overflow-x-auto leading-relaxed">
+              <div className="p-4 flex-1 font-mono text-xs text-slate-200 whitespace-pre-wrap overflow-y-auto overflow-x-auto leading-relaxed bg-[#020617]/70">
                 {isRunning ? (
                   <div className="flex items-center gap-2 text-indigo-400 py-6">
                     <div className="w-4 h-4 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin" />
-                    <span>Executing ABAP program in sandbox...</span>
+                    <span>Executing ABAP program in cloud runtime...</span>
                   </div>
                 ) : (
                   activeOutput

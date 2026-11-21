@@ -73,7 +73,16 @@ export function normalizeLanguage(lang: string): string {
     case "shell":
     case "zsh":
       return "bash"
+    case "django":
+      return "python"
+    case "plsql":
+      return "sql"
     case "abap":
+    case "sap":
+    case "sap abap":
+    case "sap-abap":
+    case "abap 7.40":
+    case "abap-oops":
       return "abap"
     default:
       return "clike"
@@ -95,6 +104,27 @@ interface TokenRule {
 }
 
 function getRules(lang: string): TokenRule[] {
+  if (lang === "abap") {
+    return [
+      { type: "comment", regex: /^(?:^\*.*|".*)/ },
+      { type: "string", regex: /^(?:'(?:''|[^'\n\r])*'|`(?:``|[^`\n\r])*`|\|(?:\\\||[^\|\n\r])*\|)/ },
+      { type: "builtin", regex: /^(?:sy-[a-zA-Z0-9_]+|<[a-zA-Z0-9_]+>|abap_true|abap_false|abap_undefined|abap_bool|space|me|super)\b/i },
+      { type: "number", regex: /^(?:\b\d+(?:\.\d+)?)\b/ },
+      {
+        type: "keyword",
+        regex:
+          /^(?:REPORT|PROGRAM|DATA|CONSTANTS|TYPES|TABLES|FIELD-SYMBOLS|PARAMETERS|SELECT-OPTIONS|WRITE|ULINE|SKIP|NEW-LINE|IF|ELSEIF|ELSE|ENDIF|CASE|WHEN|ENDCASE|DO|ENDDO|WHILE|ENDWHILE|LOOP|AT|ENDLOOP|READ|TABLE|APPEND|INSERT|MODIFY|DELETE|SORT|CLEAR|REFRESH|FREE|FORM|ENDFORM|PERFORM|USING|CHANGING|CLASS|ENDCLASS|METHOD|ENDMETHOD|DEFINITION|IMPLEMENTATION|PUBLIC|PROTECTED|PRIVATE|SECTION|METHODS|INTERFACES|EVENTS|CREATE|OBJECT|NEW|TRY|CATCH|CLEANUP|ENDTRY|RAISE|EXCEPTION|SELECT|FROM|INTO|CORRESPONDING|FIELDS|WHERE|ORDER|BY|GROUP|HAVING|UP|TO|ROWS|SINGLE|JOIN|INNER|LEFT|OUTER|ON|START-OF-SELECTION|INITIALIZATION|SELECTION-SCREEN|TOP-OF-PAGE|END-OF-SELECTION|CHECK|EXIT|CONTINUE|RETURN|ASSIGN|TYPE|LIKE|STANDARD|SORTED|HASHED|WITH|UNIQUE|NON-UNIQUE|KEY|INITIAL|VALUE|DEFAULT|IMPORTING|EXPORTING|RETURNING|COMMIT|WORK|ROLLBACK|FOR|IN|REDEFINITION|REDEFINITIONS|ABSTRACT|FINAL|READ-ONLY|OPTIONAL|PREFERRED|RECEIVING|RAISING|RESUMABLE|CONSTRUCTOR|CLASS-CONSTRUCTOR|CLASS-DATA|CLASS-METHODS|ALIASES|IS|BOUND|NOT|EQ|NE|LT|LE|GT|GE|AND|OR|BETWEEN|COND|SWITCH|FILTER|LINES|EXISTS|ASSIGNING|APPENDING|LINE|LINES|TRANSPORTING|NO|CAST|EXACT|REDUCE|LET|BASE)\b/i,
+      },
+      {
+        type: "class-name",
+        regex: /^(?:I|INT1|INT2|INT4|INT8|P|F|C|N|D|T|X|STRING|XSTRING|DECIMALS|LENGTH|BEGIN|OF|END|REF|TO|ANY|ABAP_BOOL|BOOLEAN|CL_[a-zA-Z0-9_]+|CX_[a-zA-Z0-9_]+|IF_[a-zA-Z0-9_]+)\b/i,
+      },
+      { type: "operator", regex: /^(?:->\*|->|=>|\?=|&&|<>|<=|>=|:=|=|<|>|\+|-|\*|\/)/ },
+      { type: "punctuation", regex: /^[{}()[\];,.:@]/ },
+      { type: "variable", regex: /^[a-zA-Z0-9_#\-]+/ },
+    ]
+  }
+
   if (lang === "python") {
     return [
       { type: "comment", regex: /^(?:"""[\s\S]*?"""|'''[\s\S]*?'''|#.*)/ },
@@ -248,7 +278,7 @@ function getRules(lang: string): TokenRule[] {
 
   if (lang === "php") {
     return [
-      { type: "macro", regex: /^<\?(?:php|=)?|\?>/ },
+      { type: "macro", regex: /^(?:<\?(?:php|=)?|\?>)/ },
       { type: "comment", regex: /^(?:\/\*[\s\S]*?\*\/|\/\/.*|#.*)/ },
       { type: "string", regex: /^(?:"(?:\\.|[^"\\\n])*"|'(?:\\.|[^'\\\n])*')/ },
       { type: "number", regex: /^(?:0[xX][0-9a-fA-F]+|\b\d+(?:\.\d+)?)\b/ },
@@ -455,7 +485,7 @@ export function highlightCode(code: string, language: string): string {
     for (let r = 0; r < rules.length; r++) {
       const rule = rules[r]
       const match = sub.match(rule.regex)
-      if (match) {
+      if (match && match.index === 0) {
         const text = match[0]
         html += `<span class="token ${rule.type}">${escapeHtml(text)}</span>`
         pos += text.length

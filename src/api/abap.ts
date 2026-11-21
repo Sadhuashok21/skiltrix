@@ -74,6 +74,7 @@ export interface ABAPExecutionResult {
   status: boolean
   output: string
   execution_time_ms: number
+  sy_subrc?: number
   diagnostics: Array<{
     line?: number
     column?: number

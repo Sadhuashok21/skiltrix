@@ -136,12 +136,6 @@ export default function PHPCompilerLanding() {
             <Play className="w-4 h-4 fill-white" />
             Launch Live PHP Compiler
           </Link>
-          <Link
-            to="/practice"
-            className="inline-flex items-center gap-2 px-4 py-2.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 text-sm font-semibold rounded-xl transition-colors"
-          >
-            Browse Problems
-          </Link>
         </div>
       </div>
 

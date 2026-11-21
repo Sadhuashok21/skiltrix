@@ -47,6 +47,8 @@ import {
   type TestCaseResult,
 } from "../api/practice"
 import CodeEditor from "../components/CodeEditor"
+import CodeBlock from "../components/CodeBlock"
+import { renderInlineMarkdown } from "../utils/markdownRenderer"
 
 const ASSESSMENT_LANGUAGES = [
   { id: "python", label: "Python 3", ext: "py" },
@@ -688,9 +690,14 @@ export default function AssessmentView() {
                     </div>
                     <p className="leading-relaxed text-slate-400">{pe.explanation}</p>
                     {pe.solution_code && (
-                      <pre className="bg-[#0b0e14] p-3 rounded border border-slate-800/80 font-mono text-[11px] text-emerald-300 overflow-x-auto whitespace-pre-wrap">
-                        {pe.solution_code}
-                      </pre>
+                      <div className="mt-2">
+                        <CodeBlock
+                          code={pe.solution_code}
+                          language={currentDraft?.lang || "python"}
+                          filename="solution_optimal"
+                          maxHeight="320px"
+                        />
+                      </div>
                     )}
                   </div>
                 </div>
@@ -890,7 +897,10 @@ export default function AssessmentView() {
         <div className="flex items-center gap-2">
           <button
             onClick={() => {
-              if (currentQuestionIdx > 0) setCurrentQuestionIdx(currentQuestionIdx - 1)
+              if (currentQuestionIdx > 0) {
+                setCurrentQuestionIdx(currentQuestionIdx - 1)
+                window.scrollTo({ top: 0, left: 0, behavior: "instant" })
+              }
             }}
             disabled={currentQuestionIdx === 0}
             className="p-1 rounded bg-slate-800 text-slate-400 hover:text-white disabled:opacity-40"
@@ -901,6 +911,7 @@ export default function AssessmentView() {
             onClick={() => {
               if (currentQuestionIdx < currentSectionQuestions.length - 1) {
                 setCurrentQuestionIdx(currentQuestionIdx + 1)
+                window.scrollTo({ top: 0, left: 0, behavior: "instant" })
               }
             }}
             disabled={currentQuestionIdx === currentSectionQuestions.length - 1}
@@ -1042,7 +1053,12 @@ export default function AssessmentView() {
 
                 {/* Description */}
                 <div className="text-sm text-slate-300 leading-relaxed space-y-3">
-                  <p className="whitespace-pre-wrap">{currentProblem.description || activeQuestionItem.prompt}</p>
+                  <p className="whitespace-pre-wrap">
+                    {renderInlineMarkdown(currentProblem.description || activeQuestionItem.prompt, {
+                      boldClassName: "font-bold text-white",
+                      codeClassName: "px-1.5 py-0.5 rounded bg-slate-800 text-indigo-400 font-mono text-xs border border-slate-700",
+                    })}
+                  </p>
                 </div>
 
                 {/* Constraints */}

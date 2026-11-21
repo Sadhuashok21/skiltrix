@@ -5,7 +5,7 @@ import { Copy, Check } from "lucide-react";
 
 interface CodeBlockProps {
   code: string;
-  language: string;
+  language?: string;
   filename?: string;
   showLineNumbers?: boolean;
   className?: string;
@@ -17,36 +17,45 @@ const LANGUAGE_LABELS: Record<string, { label: string; ext: string }> = {
   java: { label: "Java", ext: "java" },
   c: { label: "C", ext: "c" },
   cpp: { label: "C++", ext: "cpp" },
+  csharp: { label: "C#", ext: "cs" },
+  go: { label: "Go", ext: "go" },
+  rust: { label: "Rust", ext: "rs" },
+  php: { label: "PHP", ext: "php" },
   javascript: { label: "JavaScript", ext: "js" },
+  typescript: { label: "TypeScript", ext: "ts" },
   sql: { label: "SQL", ext: "sql" },
   markup: { label: "HTML", ext: "html" },
   css: { label: "CSS", ext: "css" },
+  bash: { label: "Bash", ext: "sh" },
+  json: { label: "JSON", ext: "json" },
+  abap: { label: "SAP ABAP", ext: "abap" },
   clike: { label: "Code", ext: "txt" },
 };
 
 export default function CodeBlock({
   code,
-  language,
+  language = "clike",
   filename,
   showLineNumbers = true,
   className = "",
   maxHeight = "480px",
 }: CodeBlockProps) {
   const [copied, setCopied] = useState(false);
+  const codeStr = (code || "").trim();
   const normalized = normalizeLanguage(language);
   const langMeta = LANGUAGE_LABELS[normalized] || {
-    label: language.toUpperCase(),
+    label: (language || "CODE").toUpperCase(),
     ext: "txt",
   };
 
   const highlighted = useMemo(() => {
-    return highlightCode(code.trim(), normalized);
-  }, [code, normalized]);
+    return highlightCode(codeStr, normalized);
+  }, [codeStr, normalized]);
 
-  const lines = useMemo(() => code.trim().split("\n"), [code]);
+  const lines = useMemo(() => (codeStr ? codeStr.split("\n") : [""]), [codeStr]);
 
   const handleCopy = () => {
-    navigator.clipboard?.writeText(code.trim());
+    navigator.clipboard?.writeText(codeStr);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };

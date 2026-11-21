@@ -9,6 +9,7 @@ import {
 } from "lucide-react"
 import { LessonQuiz } from "../../data/tutorialsCatalog"
 import { recordLessonProgress, getStoredProgress } from "../../api/tutorialsApi"
+import { renderInlineMarkdown } from "../../utils/markdownRenderer"
 
 interface LessonQuizWidgetProps {
   quiz: LessonQuiz
@@ -100,7 +101,7 @@ export default function LessonQuizWidget({
       {/* Question */}
       <div className="mb-5">
         <p className="text-base font-medium text-slate-800 dark:text-slate-200 leading-snug">
-          {quiz.question}
+          {renderInlineMarkdown(quiz.question)}
         </p>
       </div>
 
@@ -150,7 +151,7 @@ export default function LessonQuizWidget({
                 >
                   {letters[idx] || idx + 1}
                 </span>
-                <span className="text-sm font-sans">{option}</span>
+                <span className="text-sm font-sans">{renderInlineMarkdown(option)}</span>
               </div>
 
               {isSubmitted && isCorrect && <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />}
@@ -184,7 +185,7 @@ export default function LessonQuizWidget({
               </>
             )}
           </div>
-          <p className="mt-1 font-sans">{quiz.explanation}</p>
+          <p className="mt-1 font-sans">{renderInlineMarkdown(quiz.explanation)}</p>
         </div>
       )}
 

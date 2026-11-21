@@ -110,8 +110,8 @@ html.dark ::-webkit-scrollbar-thumb:hover {
   border-radius: 4px;
 }
 
-/* Smooth transitions for interactive elements */
-button, a, input, select, textarea {
+/* Smooth transitions for interactive elements (excluding code editor textareas to prevent typing/cursor lag) */
+button, a, input, select, textarea:not(.code-editor-textarea):not([class*="code-editor"]) {
   transition: all 0.15s ease;
 }
 
@@ -181,7 +181,7 @@ html.dark :where(.text-gray-500:not([class*="dark:text-"])) {
 }
 
 /* Badges & Accent Pills */
-html.dark :where(.bg-indigo-50:not([class*="dark:bg-"]):not([class*="bg-indigo-50/"])) {
+html.dark :where([class*="bg-indigo-50"]:not([class*="dark:bg-"])) {
   background-color: rgba(49, 46, 129, 0.4);
 }
 html.dark :where(.text-indigo-950:not([class*="dark:text-"])) {
@@ -190,41 +190,85 @@ html.dark :where(.text-indigo-950:not([class*="dark:text-"])) {
 html.dark :where(.text-indigo-900:not([class*="dark:text-"])) {
   color: #a5b4fc;
 }
-html.dark :where(.border-indigo-100:not([class*="dark:border-"])),
-html.dark :where(.border-indigo-200:not([class*="dark:border-"])) {
+html.dark :where([class*="border-indigo-100"]:not([class*="dark:border-"])),
+html.dark :where([class*="border-indigo-200"]:not([class*="dark:border-"])) {
   border-color: rgba(99, 102, 241, 0.3);
 }
 
-html.dark :where(.bg-emerald-50:not([class*="dark:bg-"]):not([class*="bg-emerald-50/"])) {
+html.dark :where([class*="bg-blue-50"]:not([class*="dark:bg-"])) {
+  background-color: rgba(30, 58, 138, 0.35);
+}
+html.dark :where(.text-blue-900:not([class*="dark:text-"]), .text-blue-950:not([class*="dark:text-"])) {
+  color: #bfdbfe;
+}
+html.dark :where([class*="border-blue-100"]:not([class*="dark:border-"])),
+html.dark :where([class*="border-blue-200"]:not([class*="dark:border-"])) {
+  border-color: rgba(59, 130, 246, 0.3);
+}
+
+html.dark :where([class*="bg-purple-50"]:not([class*="dark:bg-"])) {
+  background-color: rgba(88, 28, 135, 0.35);
+}
+html.dark :where(.text-purple-900:not([class*="dark:text-"]), .text-purple-950:not([class*="dark:text-"])) {
+  color: #e9d5ff;
+}
+html.dark :where([class*="border-purple-100"]:not([class*="dark:border-"])),
+html.dark :where([class*="border-purple-200"]:not([class*="dark:border-"])) {
+  border-color: rgba(168, 85, 247, 0.3);
+}
+
+html.dark :where([class*="bg-emerald-50"]:not([class*="dark:bg-"])) {
   background-color: rgba(6, 78, 59, 0.4);
 }
 html.dark :where(.text-emerald-900:not([class*="dark:text-"]), .text-emerald-950:not([class*="dark:text-"])) {
   color: #a7f3d0;
 }
-html.dark :where(.border-emerald-100:not([class*="dark:border-"])),
-html.dark :where(.border-emerald-200:not([class*="dark:border-"])) {
+html.dark :where([class*="border-emerald-100"]:not([class*="dark:border-"])),
+html.dark :where([class*="border-emerald-200"]:not([class*="dark:border-"])) {
   border-color: rgba(16, 185, 129, 0.3);
 }
 
-html.dark :where(.bg-amber-50:not([class*="dark:bg-"]):not([class*="bg-amber-50/"])) {
+html.dark :where([class*="bg-amber-50"]:not([class*="dark:bg-"])) {
   background-color: rgba(120, 53, 15, 0.4);
 }
 html.dark :where(.text-amber-900:not([class*="dark:text-"]), .text-amber-950:not([class*="dark:text-"])) {
   color: #fde68a;
 }
-html.dark :where(.border-amber-100:not([class*="dark:border-"])),
-html.dark :where(.border-amber-200:not([class*="dark:border-"])) {
+html.dark :where([class*="border-amber-100"]:not([class*="dark:border-"])),
+html.dark :where([class*="border-amber-200"]:not([class*="dark:border-"])) {
   border-color: rgba(245, 158, 11, 0.3);
 }
 
-html.dark :where(.bg-rose-50:not([class*="dark:bg-"]):not([class*="bg-rose-50/"])) {
+html.dark :where([class*="bg-orange-50"]:not([class*="dark:bg-"])) {
+  background-color: rgba(124, 45, 18, 0.35);
+}
+html.dark :where(.text-orange-900:not([class*="dark:text-"]), .text-orange-950:not([class*="dark:text-"])) {
+  color: #fed7aa;
+}
+html.dark :where([class*="border-orange-100"]:not([class*="dark:border-"])),
+html.dark :where([class*="border-orange-200"]:not([class*="dark:border-"])) {
+  border-color: rgba(249, 115, 22, 0.3);
+}
+
+html.dark :where([class*="bg-cyan-50"]:not([class*="dark:bg-"])) {
+  background-color: rgba(22, 78, 99, 0.35);
+}
+html.dark :where(.text-cyan-900:not([class*="dark:text-"]), .text-cyan-950:not([class*="dark:text-"])) {
+  color: #a5f3fc;
+}
+html.dark :where([class*="border-cyan-100"]:not([class*="dark:border-"])),
+html.dark :where([class*="border-cyan-200"]:not([class*="dark:border-"])) {
+  border-color: rgba(6, 182, 212, 0.3);
+}
+
+html.dark :where([class*="bg-rose-50"]:not([class*="dark:bg-"])) {
   background-color: rgba(136, 19, 55, 0.4);
 }
 html.dark :where(.text-rose-900:not([class*="dark:text-"]), .text-rose-950:not([class*="dark:text-"])) {
   color: #fecdd3;
 }
-html.dark :where(.border-rose-100:not([class*="dark:border-"])),
-html.dark :where(.border-rose-200:not([class*="dark:border-"])) {
+html.dark :where([class*="border-rose-100"]:not([class*="dark:border-"])),
+html.dark :where([class*="border-rose-200"]:not([class*="dark:border-"])) {
   border-color: rgba(239, 68, 68, 0.3);
 }
 
@@ -278,9 +322,22 @@ html.dark textarea[class*="bg-transparent"]:not([class*="dark:bg-slate-9"]):not(
   background-color: transparent !important;
   color: transparent !important;
   -webkit-text-fill-color: transparent !important;
+  caret-color: #818cf8 !important;
   border-color: transparent !important;
   box-shadow: none !important;
   outline: none !important;
+  transition: none !important;
+  -webkit-font-smoothing: antialiased !important;
+  -moz-osx-font-smoothing: grayscale !important;
+  text-rendering: optimizeLegibility !important;
+  font-variant-ligatures: none !important;
+}
+
+.code-editor-textarea::selection,
+textarea.code-editor-textarea::selection {
+  background: rgba(99, 102, 241, 0.35) !important;
+  color: transparent !important;
+  -webkit-text-fill-color: transparent !important;
 }
 
 /* Inline code tags in text/markdown */
@@ -323,15 +380,24 @@ pre[class*="language-"],
 code[class*="language-"] {
   font-family: var(--font-mono);
   color: #f8fafc !important;
+  -webkit-font-smoothing: antialiased !important;
+  -moz-osx-font-smoothing: grayscale !important;
+  text-rendering: optimizeLegibility !important;
+  font-variant-ligatures: none !important;
 }
 
 .code-block code,
 .code-editor code {
   color: inherit;
+  font-family: inherit;
+  font-size: inherit;
+  line-height: inherit;
 }
 
 .token {
   font-family: inherit;
+  font-variant-ligatures: none;
+  letter-spacing: inherit;
 }
 
 /* Comments: Muted slate italic */

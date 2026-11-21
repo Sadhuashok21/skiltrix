@@ -85,12 +85,6 @@ export default function SQLPractice() {
             <Play className="w-4 h-4 fill-white" />
             Launch SQL Compiler
           </Link>
-          <Link
-            to="/practice"
-            className="inline-flex items-center gap-2 px-4 py-2 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 text-sm font-medium rounded-xl transition-colors"
-          >
-            All Practice Problems
-          </Link>
         </div>
       </div>
 

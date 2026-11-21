@@ -664,6 +664,7 @@ export default function Practice() {
                 onChange={setCode}
                 language={practiceLang}
                 fontSize="sm"
+                onRun={runCode}
               />
             </div>
 

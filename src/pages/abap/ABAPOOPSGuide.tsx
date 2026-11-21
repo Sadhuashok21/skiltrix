@@ -1,5 +1,6 @@
 import React, { useState } from "react"
 import { Link } from "react-router-dom"
+import CodeBlock from "../../components/CodeBlock"
 import {
   Code2,
   Terminal,
@@ -627,18 +628,14 @@ export default function ABAPOOPSGuide() {
                 </ul>
               </div>
 
-              {/* Code Snippet Box */}
+              {/* Code Snippet Box with Syntax Highlighting */}
               <div className="mt-6">
-                <div className="flex items-center justify-between bg-slate-900 text-slate-300 px-4 py-2.5 rounded-t-xl border border-slate-800 text-xs font-mono">
-                  <div className="flex items-center gap-2">
-                    <FileCode className="w-4 h-4 text-indigo-400" />
-                    <span>ABAP OO Executable Pattern</span>
-                  </div>
-                  <span className="text-[11px] text-slate-400">ABAP 7.40+</span>
-                </div>
-                <pre className="bg-slate-950 text-slate-100 p-5 rounded-b-xl border-x border-b border-slate-800 font-mono text-xs overflow-x-auto leading-relaxed selection:bg-indigo-600 selection:text-white">
-                  <code>{selectedTopic.codeSnippet}</code>
-                </pre>
+                <CodeBlock
+                  code={selectedTopic.codeSnippet}
+                  language="abap"
+                  filename={`${selectedTopic.id}.abap`}
+                  maxHeight="480px"
+                />
               </div>
 
               {/* Best Practices & Common Pitfalls */}

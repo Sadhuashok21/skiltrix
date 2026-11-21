@@ -16,6 +16,10 @@ export default defineConfig({
     port: Number.parseInt(process.env.PORT || "8443", 10),
     strictPort: true,
     proxy: {
+      "/api": {
+        target: "http://127.0.0.1:8000",
+        changeOrigin: true,
+      },
       "/apps": {
         target: "http://127.0.0.1:8000",
         changeOrigin: true,
@@ -30,6 +34,10 @@ export default defineConfig({
     host: process.env.DEV_SERVER_HOST || "0.0.0.0",
     port: Number.parseInt(process.env.PORT || "8443", 10),
     proxy: {
+      "/api": {
+        target: "http://127.0.0.1:8000",
+        changeOrigin: true,
+      },
       "/apps": {
         target: "http://127.0.0.1:8000",
         changeOrigin: true,

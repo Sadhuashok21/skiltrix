@@ -1,6 +1,8 @@
 import React, { useState } from "react"
 import { Link } from "react-router-dom"
+import CodeBlock from "../components/CodeBlock"
 import { Code2, Play, BookOpen, Bug, CheckCircle2, ArrowRight, Layers, Sparkles, Terminal } from "lucide-react"
+import { renderInlineMarkdown } from "../utils/markdownRenderer"
 
 interface TutorialChapter {
   id: string
@@ -102,12 +104,6 @@ export default function DjangoTutorials() {
             <Play className="w-4 h-4 fill-white" />
             Launch CodeLab
           </Link>
-          <Link
-            to="/practice"
-            className="inline-flex items-center gap-2 px-4 py-2 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 text-sm font-medium rounded-xl transition-colors"
-          >
-            Backend Debugging Problems
-          </Link>
         </div>
       </div>
 
@@ -132,7 +128,7 @@ export default function DjangoTutorials() {
                   {chap.category}
                 </span>
                 <h3 className="text-sm font-bold text-slate-900 mt-2 mb-1">{chap.title}</h3>
-                <p className="text-xs text-slate-500 line-clamp-2">{chap.description}</p>
+                <p className="text-xs text-slate-500 line-clamp-2">{renderInlineMarkdown(chap.description)}</p>
               </div>
             )
           })}
@@ -144,19 +140,21 @@ export default function DjangoTutorials() {
               {selectedChapter.category}
             </span>
             <h2 className="text-xl font-bold text-slate-900 mt-1">{selectedChapter.title}</h2>
-            <p className="text-xs text-slate-600 mt-2 leading-relaxed">{selectedChapter.description}</p>
+            <p className="text-xs text-slate-600 mt-2 leading-relaxed">{renderInlineMarkdown(selectedChapter.description)}</p>
           </div>
 
-          <div className="p-4 bg-slate-950 font-mono text-xs text-emerald-300 overflow-x-auto">
-            <div className="text-slate-500 mb-2 font-sans text-[11px] uppercase tracking-wider font-bold">
-              Code Pattern & Architecture:
-            </div>
-            <pre className="leading-relaxed whitespace-pre">{selectedChapter.codeSnippet}</pre>
+          <div className="p-4 bg-slate-950">
+            <CodeBlock
+              code={selectedChapter.codeSnippet}
+              language="python"
+              filename={`${selectedChapter.id}.py`}
+              maxHeight="420px"
+            />
           </div>
 
           <div className="p-5 border-t border-slate-100 bg-white">
             <h4 className="text-xs font-bold uppercase tracking-wide text-slate-700 mb-1">Architecture Note</h4>
-            <p className="text-xs text-slate-600 leading-relaxed">{selectedChapter.explanation}</p>
+            <p className="text-xs text-slate-600 leading-relaxed">{renderInlineMarkdown(selectedChapter.explanation)}</p>
           </div>
 
           <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between">

@@ -206,7 +206,7 @@ export default function ABAPPricing() {
               <Tag className="absolute left-3 top-3.5 h-4 w-4 text-slate-400" />
             <input id="coupon" value={code} onChange={(event) => { setCode(event.target.value); setQuote(null); setError("") }} placeholder="Enter coupon code" className="w-full rounded-lg border border-slate-300 py-3 pl-10 pr-3 outline-none focus:border-indigo-500" />
             </div>
-            <button disabled={loading || !code.trim()} className="rounded-lg bg-slate-900 px-5 font-semibold text-white disabled:opacity-50">{loading ? "Checking…" : "Apply"}</button>
+            <button type="submit" disabled={loading || !code.trim()} className="rounded-lg bg-slate-900 px-5 font-semibold text-white disabled:opacity-50">{loading ? "Checking…" : "Apply"}</button>
           </div>
           {error && <p role="alert" className="mt-3 text-sm text-rose-600">{error}</p>}
           {quote && <p className="mt-3 flex items-center gap-2 text-sm text-emerald-700"><CheckCircle2 className="h-4 w-4" /> Coupon validated. Final price {rupees(quote.final_amount_paise)}.</p>}

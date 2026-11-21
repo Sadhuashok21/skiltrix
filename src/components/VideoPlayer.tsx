@@ -42,6 +42,7 @@ interface VideoPlayerProps {
   chapters?: ChapterItem[]
   onMiniPlayerToggle?: (active: boolean) => void
   onEnded?: () => void
+  onDurationLoaded?: (durationSec: number) => void
 }
 
 const SPEED_OPTIONS = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2]
@@ -62,6 +63,7 @@ export default function VideoPlayer({
   chapters = [],
   onMiniPlayerToggle,
   onEnded,
+  onDurationLoaded,
 }: VideoPlayerProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
@@ -73,6 +75,12 @@ export default function VideoPlayer({
   const [bufferedPercent, setBufferedPercent] = useState(35)
   const [volume, setVolume] = useState(0.85)
   const [isMuted, setIsMuted] = useState(false)
+
+  useEffect(() => {
+    if (initialDurationSec && initialDurationSec > 0) {
+      setDuration(initialDurationSec)
+    }
+  }, [initialDurationSec])
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [speed, setSpeed] = useState(1)
   const [quality, setQuality] = useState("1080p HD")
@@ -327,8 +335,10 @@ export default function VideoPlayer({
           if (videoRef.current) setCurrentTime(videoRef.current.currentTime)
         }}
         onLoadedMetadata={() => {
-          if (videoRef.current && videoRef.current.duration) {
-            setDuration(videoRef.current.duration)
+          if (videoRef.current && videoRef.current.duration && !isNaN(videoRef.current.duration)) {
+            const d = videoRef.current.duration
+            setDuration(d)
+            onDurationLoaded?.(d)
           }
         }}
         onProgress={() => {

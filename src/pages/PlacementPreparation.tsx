@@ -80,9 +80,14 @@ export default function PlacementPreparation() {
       try {
         setLoading(true)
         const res = await getCompanyPreparationStats()
-        setStats(res)
+        if (Array.isArray(res)) {
+          setStats(res)
+        } else {
+          setStats([])
+        }
       } catch (err) {
         console.error("Failed to load company preparation stats", err)
+        setStats([])
       } finally {
         setLoading(false)
       }
