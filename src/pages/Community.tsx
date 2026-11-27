@@ -37,7 +37,7 @@ const tagOptions = [
 ]
 
 function DiscussionCard({ d, onAction }: { d: DiscussionCardData; onAction?: () => void }) {
-  const { user } = useAuth()
+  const { user, isAuthenticated, login } = useAuth()
   const [liked, setLiked] = useState(false)
   const [likesCount, setLikesCount] = useState(d.likes)
   const [bookmarked, setBookmarked] = useState(d.bookmarked)
@@ -46,6 +46,7 @@ function DiscussionCard({ d, onAction }: { d: DiscussionCardData; onAction?: () 
   const [replyText, setReplyText] = useState("")
   const [replyList, setReplyList] = useState<string[]>([])
   const [submittingReply, setSubmittingReply] = useState(false)
+  const [actionError, setActionError] = useState("")
 
   const handleShare = (e: React.MouseEvent) => {
     e.stopPropagation()
@@ -55,31 +56,41 @@ function DiscussionCard({ d, onAction }: { d: DiscussionCardData; onAction?: () 
   }
 
   const handleToggleLike = async () => {
-    const userId = user?.user_id || localStorage.getItem("user_id") || "guest_learner"
+    if (!isAuthenticated || !user?.user_id) {
+      setActionError("Please sign in to like discussions.")
+      return
+    }
+    setActionError("")
     const nextState = !liked
     setLiked(nextState)
     setLikesCount((prev) => (nextState ? prev + 1 : Math.max(0, prev - 1)))
     try {
-      await likeDiscussion(d.id, { user_id: userId })
+      await likeDiscussion(d.id, { user_id: user.user_id })
       onAction?.()
     } catch {
-      // ignore
+      setLiked(!nextState)
+      setLikesCount((prev) => (nextState ? Math.max(0, prev - 1) : prev + 1))
+      setActionError("Sign in required to like discussions.")
     }
   }
 
   const handleAddReply = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!isAuthenticated || !user?.user_id) {
+      setActionError("Please sign in to post a reply.")
+      return
+    }
     const content = replyText.trim()
     if (!content || submittingReply) return
-    const userId = user?.user_id || localStorage.getItem("user_id") || "guest_learner"
-    setReplyList((prev) => [...prev, content])
-    setReplyText("")
+    setActionError("")
     setSubmittingReply(true)
     try {
-      await replyDiscussion(d.id, { user_id: userId, content })
+      await replyDiscussion(d.id, { user_id: user.user_id, content })
+      setReplyList((prev) => [...prev, content])
+      setReplyText("")
       onAction?.()
     } catch {
-      // ignore
+      setActionError("Could not post reply. Please sign in and try again.")
     } finally {
       setSubmittingReply(false)
     }
@@ -169,6 +180,21 @@ function DiscussionCard({ d, onAction }: { d: DiscussionCardData; onAction?: () 
         </button>
       </div>
 
+      {actionError && (
+        <div className="mt-2 flex items-center justify-between gap-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-1.5">
+          <span>{actionError}</span>
+          {!isAuthenticated && (
+            <button
+              type="button"
+              onClick={() => void login(window.location.pathname)}
+              className="font-semibold text-indigo-600 hover:underline cursor-pointer shrink-0"
+            >
+              Sign In
+            </button>
+          )}
+        </div>
+      )}
+
       {repliesOpen && (
         <div className="mt-4 pt-3 border-t border-slate-100 space-y-3">
           {replyList.map((rep, idx) => (
@@ -200,7 +226,7 @@ function DiscussionCard({ d, onAction }: { d: DiscussionCardData; onAction?: () 
 }
 
 export default function Community() {
-  const { user } = useAuth()
+  const { user, isAuthenticated, login } = useAuth()
   const { discussions: apiDiscussions, refresh } = useSkiltrixData()
   const discussions: DiscussionCardData[] = apiDiscussions.map(mapDiscussion)
 
@@ -212,9 +238,24 @@ export default function Community() {
   const [postError, setPostError] = useState("")
   const [posting, setPosting] = useState(false)
 
-  const filteredDiscussions = discussions.filter(
-    (d) => activeTag === "All" || (d.tag || "").toLowerCase() === activeTag.toLowerCase()
-  )
+  const matchesTag = (postTag: string, filterTag: string) => {
+    if (!filterTag || filterTag === "All") return true
+    const p = (postTag || "").toLowerCase().trim()
+    const f = filterTag.toLowerCase().trim()
+    if (p === f) return true
+    if (f === "css" && (p.includes("css") || p === "html & css")) return true
+    if (f === "html" && (p.includes("html") || p === "html & css")) return true
+    if (f === "dsa" && (p.includes("dsa") || p.includes("algorithm") || p.includes("data structure"))) return true
+    if (f === "sql" && (p.includes("sql") || p.includes("database"))) return true
+    if (f === "django" && p.includes("django")) return true
+    if (f === "react" && p.includes("react")) return true
+    if (f === "python" && p.includes("python")) return true
+    if (f === "javascript" && (p.includes("javascript") || p.includes("js"))) return true
+    if (f === "java" && p.includes("java") && !p.includes("script")) return true
+    return false
+  }
+
+  const filteredDiscussions = discussions.filter((d) => matchesTag(d.tag, activeTag))
 
   // Dynamic statistics computed from live backend discussions
   const questionsAsked = apiDiscussions.length
@@ -276,7 +317,11 @@ export default function Community() {
     .map(([tag, count]) => ({ tag, count }))
 
   const submitPost = async () => {
-    const userId = user?.user_id || localStorage.getItem("user_id") || localStorage.getItem("skiltrix_user") || "guest_learner"
+    if (!isAuthenticated || !user?.user_id) {
+      setPostError("Please sign in before publishing a post.")
+      return
+    }
+    const userId = user.user_id
     const content = newPost.trim()
     if (!content) {
       setPostError("Write your post before submitting.")
@@ -328,7 +373,13 @@ export default function Community() {
           </p>
         </div>
         <button
-          onClick={() => setShowNew(true)}
+          onClick={() => {
+            if (!isAuthenticated) {
+              void login(window.location.pathname)
+              return
+            }
+            setShowNew(true)
+          }}
           className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-4 py-2.5 rounded-xl text-sm transition-colors shadow-sm"
         >
           <Plus className="w-4 h-4" />
@@ -491,17 +542,17 @@ export default function Community() {
 
             {/* Empty state placeholder */}
             {filteredDiscussions.length === 0 && (
-              <div className="bg-slate-50 dark:bg-slate-900/60 rounded-xl border border-dashed border-slate-300 dark:border-slate-800 p-8 text-center">
-                <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center mx-auto mb-3 text-slate-400">
-                  <MessageSquare className="w-6 h-6" />
+              <div className="bg-slate-50/80 dark:bg-slate-900/90 rounded-2xl border-2 border-dashed border-slate-300 dark:border-slate-700/80 p-10 text-center shadow-xs">
+                <div className="w-14 h-14 rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-100 dark:border-indigo-800/40 flex items-center justify-center mx-auto mb-3 text-indigo-600 dark:text-indigo-400">
+                  <MessageSquare className="w-7 h-7" />
                 </div>
-                <p className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-1">
+                <h4 className="text-base font-bold text-slate-800 dark:text-slate-100 mb-1.5" style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
                   {activeTag === "All"
                     ? "There are no discussions added yet"
                     : `There are no discussions added for ${activeTag} yet`}
-                </p>
-                <p className="text-xs text-slate-400 mb-4">
-                  Be the first to start a discussion today! Your question could help many other learners.
+                </h4>
+                <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto mb-5 leading-relaxed">
+                  Be the first learner to ask a question or share knowledge about {activeTag === "All" ? "programming" : activeTag}!
                 </p>
                 <button
                   onClick={() => {
@@ -510,10 +561,11 @@ export default function Community() {
                     }
                     setShowNew(true)
                   }}
-                  className="inline-flex items-center gap-1.5 text-sm font-semibold text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 hover:underline cursor-pointer"
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition-all shadow-sm hover:shadow cursor-pointer"
                 >
-                  <span>Start a discussion</span>
-                  <ArrowRight className="w-4 h-4" />
+                  <Plus className="w-4 h-4" />
+                  <span>Start a discussion in {activeTag === "All" ? "Community" : activeTag}</span>
+                  <ArrowRight className="w-4 h-4 ml-0.5" />
                 </button>
               </div>
             )}

@@ -14,14 +14,18 @@ import {
   Layers,
   Clock,
   Award,
+  Lock,
+  LogIn,
 } from "lucide-react"
 import {
+  fetchCareerRoadmaps,
   fetchCareerRoadmapDetail,
   toggleStageProgress,
   resetRoadmapProgressApi,
+  RoadmapAuthError,
 } from "../../api/roadmapApi"
-import { OFFICIAL_ROADMAPS_DATA } from "../../data/roadmapData"
-import type { RoadmapTrack, RoadmapStage } from "../../types/roadmap"
+import type { RoadmapTrack, RoadmapStage, RoadmapSummaryItem } from "../../types/roadmap"
+import { useAuth } from "../../auth"
 import RoadmapCanvasRoad from "../../components/roadmap/RoadmapCanvasRoad"
 import RoadmapTimelineList from "../../components/roadmap/RoadmapTimelineList"
 import StageDetailModal from "../../components/roadmap/StageDetailModal"
@@ -29,9 +33,12 @@ import StageDetailModal from "../../components/roadmap/StageDetailModal"
 export default function RoadmapDetail() {
   const { roadmapKey } = useParams<{ roadmapKey: string }>()
   const navigate = useNavigate()
+  const { isAuthenticated, isLoading: authLoading, login } = useAuth()
 
   const [roadmap, setRoadmap] = useState<RoadmapTrack | null>(null)
+  const [otherRoadmaps, setOtherRoadmaps] = useState<RoadmapSummaryItem[]>([])
   const [loading, setLoading] = useState(true)
+  const [authRequired, setAuthRequired] = useState(false)
   const [viewMode, setViewMode] = useState<"road" | "timeline">("road")
   const [selectedStage, setSelectedStage] = useState<RoadmapStage | null>(null)
   const [modalOpen, setModalOpen] = useState(false)
@@ -40,19 +47,36 @@ export default function RoadmapDetail() {
   const activeKey = roadmapKey || "frontend_roadmap"
 
   const loadRoadmap = async () => {
+    if (authLoading) return
+    if (!isAuthenticated) {
+      setAuthRequired(true)
+      setLoading(false)
+      return
+    }
     setLoading(true)
+    setAuthRequired(false)
     try {
-      const data = await fetchCareerRoadmapDetail(activeKey)
+      const [data, allList] = await Promise.all([
+        fetchCareerRoadmapDetail(activeKey),
+        fetchCareerRoadmaps().catch(() => []),
+      ])
       setRoadmap(data)
+      setOtherRoadmaps(allList)
+    } catch (err) {
+      if (err instanceof RoadmapAuthError) {
+        setAuthRequired(true)
+      } else {
+        setRoadmap(null)
+      }
     } finally {
       setLoading(false)
     }
   }
 
   useEffect(() => {
-    loadRoadmap()
+    void loadRoadmap()
     window.scrollTo({ top: 0, behavior: "smooth" })
-  }, [activeKey])
+  }, [activeKey, isAuthenticated, authLoading])
 
   // Handle stage click from canvas or timeline list
   const handleStageClick = (stage: RoadmapStage) => {
@@ -122,12 +146,47 @@ export default function RoadmapDetail() {
     setResetConfirmOpen(false)
   }
 
-  if (loading && !roadmap) {
+  if (authLoading || (loading && !roadmap && !authRequired)) {
     return (
       <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
           <div className="w-10 h-10 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin" />
           <span className="text-sm text-slate-500">Loading Career Roadmap...</span>
+        </div>
+      </div>
+    )
+  }
+
+  if (authRequired) {
+    return (
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-4">
+        <div className="text-center p-8 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-xl space-y-5 max-w-md w-full">
+          <div className="w-14 h-14 mx-auto rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800 flex items-center justify-center">
+            <Lock className="w-6 h-6 text-indigo-600 dark:text-indigo-400" />
+          </div>
+          <div className="space-y-2">
+            <h2 className="text-xl font-extrabold text-slate-900 dark:text-white">
+              Sign In to Access Full Roadmap
+            </h2>
+            <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed">
+              Interactive 3D milestones, topic checklists, tutorial links, and cloud progress sync are available exclusively to signed-in learners.
+            </p>
+          </div>
+          <div className="flex flex-col sm:flex-row gap-2.5 justify-center pt-1">
+            <button
+              type="button"
+              onClick={() => void login(window.location.pathname)}
+              className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm shadow-md shadow-indigo-600/20 cursor-pointer"
+            >
+              <LogIn className="w-4 h-4" /> Sign In Now
+            </button>
+            <Link
+              to="/roadmaps"
+              className="inline-flex items-center justify-center px-5 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 font-semibold text-sm hover:bg-slate-50 dark:hover:bg-slate-800"
+            >
+              Back to All Roadmaps
+            </Link>
+          </div>
         </div>
       </div>
     )
@@ -171,7 +230,8 @@ export default function RoadmapDetail() {
           {/* Other Roadmaps dropdown / pills */}
           <div className="hidden sm:flex items-center gap-2 text-xs">
             <span className="text-slate-400 font-medium">Switch Path:</span>
-            {OFFICIAL_ROADMAPS_DATA.filter((r) => r.key !== roadmap.key)
+            {otherRoadmaps
+              .filter((r) => r.key !== roadmap.key)
               .slice(0, 3)
               .map((r) => (
                 <Link

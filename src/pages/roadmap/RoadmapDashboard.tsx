@@ -18,11 +18,13 @@ import {
   RotateCcw,
   TrendingUp,
   Award,
+  Lock,
 } from "lucide-react"
 import { fetchCareerRoadmaps } from "../../api/roadmapApi"
 import type { RoadmapSummaryItem } from "../../types/roadmap"
+import { useAuth } from "../../auth"
 
-const CATEGORIES = [
+const BASE_CATEGORIES = [
   "All",
   "Web Development",
   "Backend Development",
@@ -52,7 +54,9 @@ function getCategoryIcon(cat: string) {
 }
 
 export default function RoadmapDashboard() {
+  const { isAuthenticated } = useAuth()
   const [roadmaps, setRoadmaps] = useState<RoadmapSummaryItem[]>([])
+  const [allCategories, setAllCategories] = useState<string[]>(BASE_CATEGORIES)
   const [loading, setLoading] = useState(true)
   const [selectedCategory, setSelectedCategory] = useState("All")
   const [searchQuery, setSearchQuery] = useState("")
@@ -65,6 +69,12 @@ export default function RoadmapDashboard() {
         searchQuery.trim() || undefined
       )
       setRoadmaps(data)
+      if (selectedCategory === "All" && !searchQuery.trim() && data.length > 0) {
+        const dynamicCats = Array.from(new Set(data.map((r) => r.category).filter(Boolean)))
+        setAllCategories(["All", ...dynamicCats])
+      }
+    } catch {
+      setRoadmaps([])
     } finally {
       setLoading(false)
     }
@@ -111,16 +121,16 @@ export default function RoadmapDashboard() {
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-8 pt-8 border-t border-slate-800/80">
             <div className="bg-slate-800/40 backdrop-blur-sm rounded-2xl p-4 border border-slate-700/50">
               <span className="text-xs text-slate-400 font-medium">Career Tracks</span>
-              <p className="text-2xl sm:text-3xl font-extrabold text-white mt-1">7 Paths</p>
+              <p className="text-2xl sm:text-3xl font-extrabold text-white mt-1">{totalRoadmaps} Paths</p>
             </div>
             <div className="bg-slate-800/40 backdrop-blur-sm rounded-2xl p-4 border border-slate-700/50">
               <span className="text-xs text-slate-400 font-medium">Total Milestones</span>
-              <p className="text-2xl sm:text-3xl font-extrabold text-white mt-1">42 Steps</p>
+              <p className="text-2xl sm:text-3xl font-extrabold text-white mt-1">{totalStages} Steps</p>
             </div>
             <div className="bg-slate-800/40 backdrop-blur-sm rounded-2xl p-4 border border-slate-700/50">
               <span className="text-xs text-slate-400 font-medium">Completed Milestones</span>
               <p className="text-2xl sm:text-3xl font-extrabold text-emerald-400 mt-1">
-                {completedStages} <span className="text-sm text-slate-400 font-normal">/ 42</span>
+                {completedStages} <span className="text-sm text-slate-400 font-normal">/ {totalStages}</span>
               </p>
             </div>
             <div className="bg-slate-800/40 backdrop-blur-sm rounded-2xl p-4 border border-slate-700/50">
@@ -136,7 +146,7 @@ export default function RoadmapDashboard() {
         <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
           {/* Category Tabs */}
           <div className="flex items-center gap-1.5 overflow-x-auto pb-2 md:pb-0 scrollbar-none">
-            {CATEGORIES.map((cat) => (
+            {allCategories.map((cat) => (
               <button
                 key={cat}
                 onClick={() => setSelectedCategory(cat)}
@@ -237,7 +247,7 @@ export default function RoadmapDashboard() {
                       {/* Stages preview checklist summary */}
                       <div className="space-y-1.5 pt-2 border-t border-slate-100 dark:border-slate-800">
                         <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                          Curriculum Preview (6 Phases)
+                          Curriculum Preview ({roadmap.total_stages} Phases)
                         </span>
                         <div className="grid grid-cols-2 gap-1 text-[11px] text-slate-600 dark:text-slate-300">
                           {roadmap.stages_summary.slice(0, 4).map((st) => (
@@ -295,7 +305,11 @@ export default function RoadmapDashboard() {
                           : "bg-slate-900 hover:bg-slate-800 dark:bg-slate-800 dark:hover:bg-slate-700 text-white"
                       }`}
                     >
-                      {isCompleted ? (
+                      {!isAuthenticated ? (
+                        <>
+                          <Lock className="w-4 h-4" /> Sign In for Full Roadmap
+                        </>
+                      ) : isCompleted ? (
                         <>
                           <CheckCircle2 className="w-4 h-4" /> Review Completed Path
                         </>

@@ -1,11 +1,12 @@
 import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from "react"
 import { BrowserRouter, Routes, Route, Navigate, useNavigate, useSearchParams, useParams, useLocation } from "react-router-dom"
 import Layout from "./components/Layout"
-import { SkiltrixDataProvider } from "./context/SkiltrixDataContext"
+import { SkiltrixDataProvider, useSkiltrixData } from "./context/SkiltrixDataContext"
 import { ThemeProvider } from "./context/ThemeContext"
 import { getGlobalSignInUrl } from "./api/auth"
-import api from "./api/client"
+import api, { API_ORIGIN } from "./api/client"
 import { AuthProvider, AuthCallback, initiateLogin } from "./auth"
+import { resolveAccountsUrl } from "./auth/pkce"
 
 // Global scroll to top on every route change
 function ScrollToTop() {
@@ -50,14 +51,12 @@ const Interview        = lazy(() => import("./pages/Interview"))
 const Profile          = lazy(() => import("./pages/Profile"))
 const Notifications    = lazy(() => import("./pages/Notifications"))
 const About            = lazy(() => import("./pages/About"))
-const Terms            = lazy(() => import("./pages/Terms"))
 const CodeLabDashboard = lazy(() => import("./pages/CodeLabDashboard"))
 const CodeLabIDE       = lazy(() => import("./pages/CodeLabIDE"))
 const ABAPDashboard    = lazy(() => import("./pages/abap/ABAPDashboard"))
 const ABAPStudio       = lazy(() => import("./pages/abap/ABAPStudio"))
 const ABAPPricing      = lazy(() => import("./pages/abap/ABAPPricing"))
 const ABAPPaymentHistory = lazy(() => import("./pages/abap/ABAPPaymentHistory"))
-const PrivacyPolicy        = lazy(() => import("./pages/PrivacyPolicy"))
 const ABAPCompilerLanding  = lazy(() => import("./pages/abap/ABAPCompilerLanding"))
 const ABAPPractice         = lazy(() => import("./pages/abap/ABAPPractice"))
 const ABAPPrograms         = lazy(() => import("./pages/abap/ABAPPrograms"))
@@ -67,6 +66,8 @@ const SQLPractice          = lazy(() => import("./pages/SQLPractice"))
 const PHPCompilerLanding   = lazy(() => import("./pages/PHPCompilerLanding"))
 const DjangoTutorials      = lazy(() => import("./pages/DjangoTutorials"))
 const AssessmentView       = lazy(() => import("./pages/AssessmentView"))
+const AssessmentsHub       = lazy(() => import("./pages/AssessmentsHub"))
+const CodingAssessmentRunner = lazy(() => import("./pages/CodingAssessmentRunner"))
 const PlacementPreparation = lazy(() => import("./pages/PlacementPreparation"))
 const TutorialHub          = lazy(() => import("./pages/tutorials/TutorialHub"))
 const TutorialViewer       = lazy(() => import("./pages/tutorials/TutorialViewer"))
@@ -99,6 +100,26 @@ function CompilerPage() {
       <Compiler />
     </Layout>
   )
+}
+
+function CourseEntryResolver() {
+  const { id } = useParams<{ id: string }>()
+  const { courses, loading } = useSkiltrixData()
+  const isCatalogCourse = Boolean(id && courses.some((item) => item.course_id === id))
+
+  if (isCatalogCourse) {
+    return (
+      <Layout>
+        <CourseDetail />
+      </Layout>
+    )
+  }
+
+  if (loading) {
+    return <PageLoader />
+  }
+
+  return <DynamicCoursePageResolver />
 }
 
 const COMPILER_ROUTES = [
@@ -248,21 +269,28 @@ function RedirectToGlobalSignIn() {
   useEffect(() => {
     if (started.current) return
     started.current = true
-    const requestedReturnTo = searchParams.get("returnTo") || "/"
+    const storedReturnTo = (() => {
+      try {
+        return sessionStorage.getItem("sso_return_to")
+      } catch {
+        return null
+      }
+    })()
+    const requestedReturnTo = searchParams.get("returnTo") || storedReturnTo || "/"
     const safeReturnTo = requestedReturnTo.startsWith("/")
       && !requestedReturnTo.startsWith("//")
       && !requestedReturnTo.includes("\\")
       ? requestedReturnTo
       : "/"
-    initiateLogin({
+    void initiateLogin({
       clientId: "skiltrix",
-      accountsPortalUrl: (import.meta.env.VITE_ACCOUNTS_URL || "http://localhost:5174").replace(/\/+$/, ""),
-      apiBaseUrl: (import.meta.env.VITE_API_BASE_URL || "http://localhost:8000").replace(/\/+$/, ""),
+      accountsPortalUrl: resolveAccountsUrl(import.meta.env.VITE_ACCOUNTS_URL),
+      apiBaseUrl: API_ORIGIN,
       redirectUri: `${window.location.origin}/auth/callback`,
     }, safeReturnTo)
   }, [searchParams])
 
-  return null
+  return <PageLoader />
 }
 
 export default function App() {
@@ -288,8 +316,18 @@ export default function App() {
                 </Layout>
               }
             />
-            <Route path="/codelab/assessment/:assessmentId" element={<AssessmentView />} />
-            <Route path="/assessment/:assessmentId" element={<AssessmentView />} />
+            <Route
+              path="/assessments"
+              element={
+                <Layout>
+                  <AssessmentsHub />
+                </Layout>
+              }
+            />
+            <Route path="/assessments/coding/:assessmentId" element={<CodingAssessmentRunner />} />
+            <Route path="/codelab/assessment/:assessmentId" element={<CodingAssessmentRunner />} />
+            <Route path="/assessment/:assessmentId" element={<CodingAssessmentRunner />} />
+            <Route path="/assessment/legacy/:assessmentId" element={<AssessmentView />} />
             <Route
               path="/placement-preparation"
               element={
@@ -350,7 +388,7 @@ export default function App() {
 
             <Route path="/courses"     element={<Layout><Courses /></Layout>} />
             <Route path="/courses/:courseSlug/*" element={<DynamicCoursePageResolver />} />
-            <Route path="/courses/:id" element={<Layout><CourseDetail /></Layout>} />
+            <Route path="/courses/:id" element={<CourseEntryResolver />} />
             {/* Practice section hidden - redirects to Compilers hub */}
             <Route path="/practice"    element={<Navigate to="/compilers" replace />} />
             <Route path="/videos"      element={<Layout><Videos /></Layout>} />
@@ -364,9 +402,7 @@ export default function App() {
             <Route path="/profile"     element={<Layout><Profile /></Layout>} />
             <Route path="/notifications" element={<Layout><Notifications /></Layout>} />
             <Route path="/about"       element={<Layout><About /></Layout>} />
-            <Route path="/terms"       element={<PolicyRedirect />} />
-            <Route path="/privacy"     element={<PolicyRedirect />} />
-            <Route path="/privacy-policy" element={<PolicyRedirect />} />
+
 
             {/* Flagship ABAP Hub & SEO Pages under /compilers/ */}
             <Route path="/compilers/abap-oops" element={<Layout><ABAPOOPSGuide /></Layout>} />

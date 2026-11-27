@@ -20,6 +20,7 @@ import {
   Info,
   LoaderCircle,
   SearchCheck,
+  Lock,
 } from "lucide-react"
 import type { SourceDiagnostic } from "../../api/diagnostics"
 import { diagnosticNavigationTarget } from "../../utils/diagnosticState"
@@ -38,6 +39,8 @@ interface MonacoEditorPanelProps {
   theme: "vs-dark" | "light"
   isRunning: boolean
   isSaving: boolean
+  lockedPaths?: Set<string> | string[]
+  hideRunButton?: boolean
   onSelectTab: (path: string) => void
   onCloseTab: (path: string) => void
   onChangeContent: (path: string, newContent: string) => void
@@ -185,6 +188,8 @@ export default function MonacoEditorPanel({
   theme,
   isRunning,
   isSaving,
+  lockedPaths,
+  hideRunButton = false,
   onSelectTab,
   onCloseTab,
   onChangeContent,
@@ -215,6 +220,13 @@ export default function MonacoEditorPanel({
   }, [openTabs])
 
   const activeTab = uniqueTabs.find((t) => norm(t.path) === norm(activePath)) || uniqueTabs[0]
+  const lockedSet = useMemo(() => {
+    if (!lockedPaths) return new Set<string>()
+    const arr = lockedPaths instanceof Set ? Array.from(lockedPaths) : lockedPaths
+    return new Set(arr.map((p) => norm(p)))
+  }, [lockedPaths])
+  const isTabLocked = (p: string | null | undefined) => Boolean(p && lockedSet.has(norm(p)))
+  const isActiveLocked = isTabLocked(activeTab?.path)
 
   const handleEditorDidMount: OnMount = (editor, monaco) => {
     editorRef.current = editor
@@ -329,6 +341,11 @@ export default function MonacoEditorPanel({
               >
                 {renderTabFileIcon(tab.name)}
                 <span className="truncate max-w-[130px]">{tab.name}</span>
+                {isTabLocked(tab.path) && (
+                  <span title="Locked file (read-only)" className="text-amber-400/90 shrink-0 flex items-center">
+                    <Lock className="w-3 h-3" />
+                  </span>
+                )}
                 {tab.isDirty && (
                   <Circle className="w-2 h-2 fill-amber-400 text-amber-400 shrink-0" />
                 )}
@@ -350,7 +367,11 @@ export default function MonacoEditorPanel({
 
         {/* Action Controls */}
         <div className="flex items-center gap-2 shrink-0 pr-2">
-          {activeTab?.isDirty ? (
+          {isActiveLocked ? (
+            <span className="text-[11px] text-amber-300 flex items-center gap-1 font-medium px-2 py-0.5 rounded bg-amber-500/10 border border-amber-500/30">
+              <Lock className="w-3 h-3" /> Read-only
+            </span>
+          ) : activeTab?.isDirty ? (
             <span className="text-[11px] text-amber-400 flex items-center gap-1 font-medium">
               <Circle className="w-1.5 h-1.5 fill-amber-400" /> Unsaved
             </span>
@@ -362,31 +383,35 @@ export default function MonacoEditorPanel({
             <span className="text-[11px] text-slate-500">Saved</span>
           )}
 
-          <button
-            type="button"
-            onClick={onSave}
-            disabled={!activeTab?.isDirty || isSaving}
-            className="flex items-center gap-1 text-xs bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-slate-200 px-2.5 py-1 rounded transition-colors"
-            title="Save file (Ctrl+S)"
-          >
-            <Save className="w-3.5 h-3.5 text-indigo-400" />
-            <span>Save</span>
-          </button>
+          {!isActiveLocked && (
+            <button
+              type="button"
+              onClick={onSave}
+              disabled={!activeTab?.isDirty || isSaving}
+              className="flex items-center gap-1 text-xs bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-slate-200 px-2.5 py-1 rounded transition-colors"
+              title="Save file (Ctrl+S)"
+            >
+              <Save className="w-3.5 h-3.5 text-indigo-400" />
+              <span>Save</span>
+            </button>
+          )}
 
-          <button
-            type="button"
-            onClick={onRun}
-            disabled={isRunning}
-            className="flex items-center gap-1.5 text-xs bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-semibold px-3 py-1 rounded shadow-sm transition-colors"
-            title="Run Code (Ctrl+Enter)"
-          >
-            {isRunning ? (
-              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-            ) : (
-              <Play className="w-3.5 h-3.5 fill-current" />
-            )}
-            <span>{isRunning ? "Running..." : "Run"}</span>
-          </button>
+          {!hideRunButton && (
+            <button
+              type="button"
+              onClick={onRun}
+              disabled={isRunning}
+              className="flex items-center gap-1.5 text-xs bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-semibold px-3 py-1 rounded shadow-sm transition-colors"
+              title="Run Code (Ctrl+Enter)"
+            >
+              {isRunning ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <Play className="w-3.5 h-3.5 fill-current" />
+              )}
+              <span>{isRunning ? "Running..." : "Run"}</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -401,8 +426,13 @@ export default function MonacoEditorPanel({
             value={activeTab.content}
             theme={theme}
             onMount={handleEditorDidMount}
-            onChange={(val) => onChangeContent(activeTab.path, val ?? "")}
+            onChange={(val) => {
+              if (!isActiveLocked) {
+                onChangeContent(activeTab.path, val ?? "")
+              }
+            }}
             options={{
+              readOnly: isActiveLocked,
               fontSize: 14,
               fontFamily: "'Fira Code', 'Cascadia Code', Consolas, monospace",
               tabSize: 4,

@@ -27,6 +27,8 @@ export interface ApiCourse {
   type: string
   is_paid: boolean
   price: number
+  compare_price?: number
+  discount_percent?: number
   instructor_name?: string
   modules: ApiModule[]
   students_count?: number

@@ -40,8 +40,10 @@ interface VideoPlayerProps {
   initialDurationSec?: number
   subtitles?: Record<string, SubtitleItem[]>
   chapters?: ChapterItem[]
+  seekRequest?: { time: number; seq: number } | null
   onMiniPlayerToggle?: (active: boolean) => void
   onEnded?: () => void
+  onComplete?: () => void
   onDurationLoaded?: (durationSec: number) => void
 }
 
@@ -61,13 +63,22 @@ export default function VideoPlayer({
   initialDurationSec = 915, // 15:15 default duration
   subtitles = {},
   chapters = [],
+  seekRequest = null,
   onMiniPlayerToggle,
   onEnded,
+  onComplete,
   onDurationLoaded,
 }: VideoPlayerProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
   const seekbarRef = useRef<HTMLDivElement>(null)
+  const completedRef = useRef<boolean>(false)
+
+  useEffect(() => {
+    completedRef.current = false
+    setCurrentTime(0)
+    setIsPlaying(false)
+  }, [videoUrl, title])
 
   const [isPlaying, setIsPlaying] = useState(false)
   const [currentTime, setCurrentTime] = useState(0)
@@ -81,6 +92,15 @@ export default function VideoPlayer({
       setDuration(initialDurationSec)
     }
   }, [initialDurationSec])
+
+  useEffect(() => {
+    if (!seekRequest) return
+    const target = Math.max(0, seekRequest.time)
+    setCurrentTime(target)
+    if (videoRef.current) {
+      videoRef.current.currentTime = target
+    }
+  }, [seekRequest])
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [speed, setSpeed] = useState(1)
   const [quality, setQuality] = useState("1080p HD")
@@ -243,15 +263,23 @@ export default function VideoPlayer({
     setActiveSubtitle(match ? match.text : "")
   }, [currentTime, subtitleLang, subtitles])
 
-  // Simulation loop when video element has no native video stream or is paused
+  // Simulation loop when video element has no native video stream
   useEffect(() => {
-    if (isPlaying) {
+    if (isPlaying && !videoUrl) {
       timerRef.current = window.setInterval(() => {
         setCurrentTime((prev) => {
           if (prev >= duration) {
             setIsPlaying(false)
+            if (!completedRef.current) {
+              completedRef.current = true
+              onComplete?.()
+            }
             onEnded?.()
             return 0
+          }
+          if (duration > 0 && prev >= duration * 0.9 && !completedRef.current) {
+            completedRef.current = true
+            onComplete?.()
           }
           return prev + 0.25 * speed
         })
@@ -262,7 +290,7 @@ export default function VideoPlayer({
     return () => {
       if (timerRef.current) clearInterval(timerRef.current)
     }
-  }, [isPlaying, duration, speed, onEnded])
+  }, [isPlaying, duration, speed, videoUrl, onEnded, onComplete])
 
   // Keyboard Shortcuts
   useEffect(() => {
@@ -332,7 +360,23 @@ export default function VideoPlayer({
         className="w-full h-full object-cover"
         playsInline
         onTimeUpdate={() => {
-          if (videoRef.current) setCurrentTime(videoRef.current.currentTime)
+          if (videoRef.current) {
+            const t = videoRef.current.currentTime
+            const d = videoRef.current.duration || duration
+            setCurrentTime(t)
+            if (d > 0 && t >= d * 0.9 && !completedRef.current) {
+              completedRef.current = true
+              onComplete?.()
+            }
+          }
+        }}
+        onEnded={() => {
+          setIsPlaying(false)
+          if (!completedRef.current) {
+            completedRef.current = true
+            onComplete?.()
+          }
+          onEnded?.()
         }}
         onLoadedMetadata={() => {
           if (videoRef.current && videoRef.current.duration && !isNaN(videoRef.current.duration)) {

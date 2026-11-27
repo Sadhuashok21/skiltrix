@@ -312,9 +312,9 @@ export const submitProblem = async (data: {
 }
 
 export const getProblemExplanation = async (problemId: string) => {
-  const userId = localStorage.getItem("user_id") || "guest"
+  const userId = localStorage.getItem("user_id")
   const { data } = await api.get(`/problems/${encodeURIComponent(problemId)}/explanation/`, {
-    params: { user_id: userId }
+    params: userId ? { user_id: userId } : undefined,
   })
   return data
 }
@@ -335,17 +335,19 @@ export const getCompanyBlueprints = async () => {
 }
 
 export const getCompanyPreparationStats = async (): Promise<CompanyMockStat[]> => {
-  const userId = localStorage.getItem("user_id") || "guest"
+  const userId = localStorage.getItem("user_id")
   const response = await api.get("/actions/company-preparation-stats/", {
-    params: { user_id: userId }
+    params: userId ? { user_id: userId } : undefined,
   })
   return response.data?.blueprints || []
 }
 
 export const startAssessment = async (assessmentId: string): Promise<StartAssessmentResponse> => {
-  const userId = localStorage.getItem("user_id") || "guest"
+  const token = localStorage.getItem("skiltrix_access_token") || localStorage.getItem("access_token")
+  if (!token) {
+    throw new Error("Please sign in to start this assessment.")
+  }
   const response = await api.post("/actions/start-assessment/", {
-    user_id: userId,
     assessment_id: assessmentId,
   })
   return response.data

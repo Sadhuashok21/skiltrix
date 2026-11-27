@@ -27,9 +27,26 @@ export const SFS_CDN = {
   zipfiles: `${CDN_BASE_URL}/sfs/zipfiles`,
 } as const;
 
-export function getStImageUrl(filename?: string, fallback = "/placeholder-image.webp"): string {
-  if (!filename) return fallback;
-  if (/^https?:\/\//i.test(filename)) return filename;
+const PLACEHOLDER_ASSET_NAMES = new Set([
+  "default_video.webp",
+  "default_video.png",
+  "default_course.png",
+  "image.webp",
+  "course_thumb.webp",
+  "placeholder-image.webp",
+]);
+
+export function isPlaceholderStAsset(filename?: string): boolean {
+  if (!filename) return true;
+  const trimmed = filename.trim();
+  if (!trimmed) return true;
+  const base = trimmed.split("?")[0].split("/").pop()?.toLowerCase() || "";
+  return PLACEHOLDER_ASSET_NAMES.has(base);
+}
+
+export function getStImageUrl(filename?: string, fallback = ""): string {
+  if (!filename || isPlaceholderStAsset(filename)) return fallback;
+  if (/^(https?:\/\/|\/media\/|\/assets\/|data:)/i.test(filename)) return filename;
   const clean = filename.replace(/^\/+/, "");
   if (clean.startsWith("st/images/")) return `${CDN_BASE_URL}/${clean}`;
   return `${SKILTRIX_CDN.images}/${clean}`;

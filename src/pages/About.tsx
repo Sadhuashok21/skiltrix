@@ -11,7 +11,7 @@ import {
   Compass,
   RefreshCw,
 } from "lucide-react"
-import logoImg from "../assets/logo.png"
+const logoImg = "https://cdn.ascentracoresolutions.com/skiltrix_logo.png"
 
 const team = [
   {

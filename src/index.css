@@ -501,3 +501,123 @@ code[class*="language-"] {
 .token.important {
   color: #f59e0b !important;
 }
+
+/* ==============================================================================
+   CMS GENERATED COURSE CONTENT (LIGHT & DARK MODE SUPPORT)
+   ============================================================================== */
+
+html:not(.dark) .cms-page-body .generated-page-container {
+  color: #1e293b;
+}
+
+html:not(.dark) .cms-page-body .generated-content :where(h1, h2, h3, h4, h5, h6):not(.cms-code-block *):not(.cms-topic-card *):not([style*="color"]) {
+  color: #0f172a;
+}
+
+html:not(.dark) .cms-page-body .generated-content :where(p, li, td, div):not(.cms-code-block *):not(.cms-topic-card *):not([style*="color"]) {
+  color: #334155;
+}
+
+html:not(.dark) .cms-page-body .generated-content table th {
+  background: #f1f5f9 !important;
+  color: #0f172a;
+  border-color: #cbd5e1 !important;
+}
+
+html:not(.dark) .cms-page-body .generated-content table td {
+  border-color: #cbd5e1 !important;
+}
+
+html:not(.dark) .cms-page-body .generated-content blockquote {
+  color: #475569;
+  border-left-color: #4f46e5;
+}
+
+html:not(.dark) .cms-page-body .generated-content .cms-definition-box h4:not([style*="color"]),
+html:not(.dark) .cms-page-body .generated-content .cms-definition-box p:not([style*="color"]),
+html:not(.dark) .cms-page-body .generated-content .cms-callout-box p:not([style*="color"]) {
+  color: #0f172a;
+}
+
+html.dark .cms-page-body .generated-page-container {
+  color: #f8fafc;
+}
+
+html.dark .cms-page-body .generated-content :where(h1, h2, h3, h4, h5, h6):not(.cms-code-block *):not(.cms-topic-card *):not([style*="color"]) {
+  color: #ffffff;
+}
+
+html.dark .cms-page-body .generated-content :where(p, li):not(.cms-code-block *):not(.cms-topic-card *):not([style*="color"]) {
+  color: #cbd5e1;
+}
+
+.cms-page-body .generated-content .cms-code-block {
+  margin: 24px 0;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #0f172a !important;
+  border: 1px solid #334155 !important;
+  color: #e2e8f0;
+}
+
+.cms-page-body .generated-content .cms-code-block .code-header {
+  display: flex !important;
+  justify-content: space-between;
+  align-items: center;
+  background: #1e293b !important;
+  padding: 10px 16px;
+  border-bottom: 1px solid #334155;
+  color: #f1f5f9;
+}
+
+.cms-page-body .generated-content .cms-code-block .code-body {
+  display: flex !important;
+  align-items: flex-start;
+  padding: 16px;
+  background: #0f172a !important;
+  color: #e2e8f0;
+  overflow-x: auto;
+}
+
+.cms-page-body .generated-content .cms-code-block .code-line-numbers {
+  flex-shrink: 0;
+  user-select: none;
+  opacity: 0.45;
+  padding-right: 12px;
+  margin-right: 12px;
+  border-right: 1px solid rgba(255, 255, 255, 0.12);
+  text-align: right;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.6;
+  color: #94a3b8;
+}
+
+.cms-page-body .generated-content .cms-code-block pre {
+  margin: 0 !important;
+  padding: 0 !important;
+  background: transparent !important;
+  border: none !important;
+  color: #e2e8f0;
+  flex: 1;
+  font-family: var(--font-mono);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.cms-page-body .generated-content .cms-code-block pre code {
+  background: transparent !important;
+  color: inherit;
+  padding: 0 !important;
+}
+
+.cms-page-body .generated-content .cms-code-block .copy-code-btn {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #f8fafc !important;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+}

@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom"
-import logoImg from "../assets/logo.png"
+const logoImg = "https://cdn.ascentracoresolutions.com/skiltrix_logo.png"
 
 export default function Footer() {
   return (

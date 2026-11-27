@@ -20,6 +20,8 @@ export interface CourseCardData {
   image?: string
   topics: string[]
   price?: number
+  compare_price?: number
+  discount_percent?: number
   is_paid?: boolean
 }
 
@@ -79,25 +81,65 @@ export function mapCourse(course: ApiCourse, progress = 0): CourseCardData {
     }
     return total
   }, 0)
-  const minutes = Math.round(totalSeconds / 60)
+  const rawVideos = Array.isArray((course as any)?.videos) ? (course as any).videos : []
+  const videoSeconds = rawVideos.reduce((acc: number, v: any) => {
+    return acc + (Number(v?.duration_seconds) || 0)
+  }, 0)
+  const combinedSeconds = totalSeconds > 0 ? totalSeconds : videoSeconds
+  const minutes = Math.round(combinedSeconds / 60)
+
+  const formatDurationString = (mins: number, count: number): string => {
+    if (mins > 0) {
+      if (mins >= 60) {
+        const h = Math.floor(mins / 60)
+        const m = mins % 60
+        return m > 0 ? `${h}h ${m}m` : `${h}h`
+      }
+      return `${mins} min`
+    }
+    return count > 0 ? `${count * 2} min` : "Self-paced"
+  }
   const topics = modules.flatMap((module) => [
     module?.title,
     ...(Array.isArray(module?.lessons) ? module.lessons.map((lesson) => lesson?.title) : []),
   ]).filter(Boolean) as string[]
   const courseName = course?.name || "Course"
-  const technology = courseName.split(/[:–-]/)[0]?.trim() || courseName
+  const lowerName = courseName.toLowerCase()
+  const knownTech = [
+    ["cyber security", "Cyber Security"],
+    ["cybersecurity", "Cyber Security"],
+    ["sap abap", "SAP ABAP"],
+    ["abap", "SAP ABAP"],
+    ["typescript", "TypeScript"],
+    ["javascript", "JavaScript"],
+    ["python", "Python"],
+    ["django", "Django"],
+    ["react", "React"],
+    ["java", "Java"],
+    ["c++", "C++"],
+    ["sql", "SQL"],
+    ["linux", "Linux"],
+    ["html", "HTML & CSS"],
+  ].find(([needle]) => lowerName.includes(needle))
+
+  const splitTech = courseName.split(/[:–\-|]/)[0]?.trim() || courseName
+  const technology = knownTech
+    ? knownTech[1]
+    : (splitTech.length > 22 ? splitTech.split(/\s+/).slice(0, 2).join(" ") : splitTech)
   const realStudents = typeof course?.students_count === "number" ? course.students_count : 0
   const realRating = typeof course?.rating === "number" ? course.rating : null
 
   return {
     id: course?.course_id || String(Math.random()),
     title: courseName,
-    description: modules.map((module) => module?.description).filter(Boolean).join(" ") || "",
+    description:
+      modules.map((module) => module?.description).filter(Boolean).join(" ") ||
+      "Hands-on curriculum with structured video lessons and practical examples.",
     technology,
     icon: (technology || "").toLowerCase(),
     difficulty: course?.type ? course.type[0].toUpperCase() + course.type.slice(1) : "Beginner",
-    lessons: lessons.length,
-    duration: minutes > 0 ? `${minutes} min` : (lessons.length > 0 ? `${lessons.length * 2} min` : "Self-paced"),
+    lessons: lessons.length || rawVideos.length,
+    duration: formatDurationString(minutes, lessons.length || rawVideos.length),
     rating: realRating,
     students: realStudents,
     progress,
@@ -105,6 +147,13 @@ export function mapCourse(course: ApiCourse, progress = 0): CourseCardData {
     image: (course as any)?.image_url || getStImageUrl(course?.image),
     topics: topics,
     price: typeof course?.price === "number" ? course.price : 0,
+    compare_price: typeof course?.compare_price === "number" ? course.compare_price : 0,
+    discount_percent:
+      typeof course?.discount_percent === "number" && course.discount_percent > 0
+        ? course.discount_percent
+        : (typeof course?.compare_price === "number" && typeof course?.price === "number" && course.compare_price > course.price && course.price > 0)
+          ? Math.round(((course.compare_price - course.price) / course.compare_price) * 100)
+          : 0,
     is_paid: Boolean(course?.is_paid),
   }
 }

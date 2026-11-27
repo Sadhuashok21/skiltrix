@@ -30,6 +30,7 @@ import {
   Globe,
   Settings,
   Sparkles,
+  Lock,
 } from "lucide-react"
 import type { ApiProjectFile } from "../../api/codelab"
 
@@ -49,6 +50,7 @@ export interface ProjectFileExplorerProps {
   activeFilePath: string | null
   openFilePaths?: string[]
   dirtyFilePaths?: Set<string>
+  lockedPaths?: Set<string> | string[]
   onOpenFile: (path: string) => void
   onOpenToSide?: (path: string) => void
   onCreateFile: (path: string, isDirectory: boolean) => Promise<void>
@@ -211,6 +213,7 @@ export default function ProjectFileExplorer({
   activeFilePath,
   openFilePaths = [],
   dirtyFilePaths = new Set(),
+  lockedPaths,
   onOpenFile,
   onOpenToSide,
   onCreateFile,
@@ -226,11 +229,16 @@ export default function ProjectFileExplorer({
   const [expandedFolders, setExpandedFolders] = useState<Record<string, boolean>>({
     "": true,
     config: true,
+    posts: true,
     myapp: true,
     templates: true,
     static: true,
     app: true,
   })
+  const lockedSet = useMemo(() => {
+    if (!lockedPaths) return new Set<string>()
+    return lockedPaths instanceof Set ? lockedPaths : new Set(lockedPaths)
+  }, [lockedPaths])
 
   // Search filter
   const [filterQuery, setFilterQuery] = useState("")
@@ -554,7 +562,8 @@ export default function ProjectFileExplorer({
           : depth === 0
       const isActive = activeFilePath === node.path
       const isDirty = dirtyFilePaths.has(node.path)
-      const isRenaming = renamingPath === node.path
+      const isLocked = !node.isDirectory && lockedSet.has(node.path)
+      const isRenaming = !isLocked && renamingPath === node.path
       const isDropTarget = dropTargetFolder === node.path
       const isCutTarget = clipboard?.action === "cut" && clipboard.path === node.path
 
@@ -642,8 +651,13 @@ export default function ProjectFileExplorer({
               )}
             </div>
 
-            {/* Badges, Dirty Indicator, and Hover Actions */}
+            {/* Badges, Lock Icon, Dirty Indicator, and Hover Actions */}
             <div className="flex items-center gap-1 shrink-0 ml-1">
+              {isLocked && (
+                <span title="Locked file (read-only)" className="text-slate-400 shrink-0 flex items-center">
+                  <Lock className="w-3 h-3" />
+                </span>
+              )}
               {isDirty && (
                 <span
                   title="Unsaved changes"
@@ -679,28 +693,32 @@ export default function ProjectFileExplorer({
                     </button>
                   </>
                 )}
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    handleStartRename(node.path)
-                  }}
-                  title="Rename (F2)"
-                  className="p-1 hover:text-white hover:bg-[#1a334f] rounded"
-                >
-                  <Edit2 className="w-3 h-3" />
-                </button>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    setDeleteConfirmPath({ path: node.path, isFolder: node.isDirectory })
-                  }}
-                  title="Delete"
-                  className="p-1 hover:text-red-400 hover:bg-[#1a334f] rounded"
-                >
-                  <Trash2 className="w-3 h-3" />
-                </button>
+                {!isLocked && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleStartRename(node.path)
+                      }}
+                      title="Rename (F2)"
+                      className="p-1 hover:text-white hover:bg-[#1a334f] rounded"
+                    >
+                      <Edit2 className="w-3 h-3" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setDeleteConfirmPath({ path: node.path, isFolder: node.isDirectory })
+                      }}
+                      title="Delete"
+                      className="p-1 hover:text-red-400 hover:bg-[#1a334f] rounded"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </button>
+                  </>
+                )}
               </div>
             </div>
           </div>

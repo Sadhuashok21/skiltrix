@@ -8,6 +8,8 @@ export interface ApiComment {
   video_title?: string
   user?: string
   user_name?: string
+  parent?: number | null
+  parent_id?: number | null
   created_at?: string
 }
 
@@ -20,10 +22,12 @@ export const getComments = async (videoId?: string | number) => {
 export const createComment = async (data: {
   video_id: string | number
   comment: string
+  parent_id?: number | null
 }) => {
   const response = await api.post("/comments/", {
     video_id: String(data.video_id),
     comment: data.comment,
+    ...(data.parent_id ? { parent_id: data.parent_id } : {}),
   })
   return response.data as ApiComment
 }

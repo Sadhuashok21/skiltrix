@@ -4,6 +4,7 @@ import { useSkiltrixData } from "../context/SkiltrixDataContext"
 import { mapQuiz, type QuizCardData } from "../data/apiAdapters"
 import { getQuiz, submitQuiz, type ApiQuiz } from "../api/quizzes"
 import { TechIcon } from "../components/TechIcons"
+import { useAuth } from "../auth"
 import {
   Trophy,
   Award,
@@ -113,6 +114,7 @@ const questions = [
 type QuizState = "browse" | "quiz" | "results"
 
 export default function Quizzes() {
+  const { user, isAuthenticated } = useAuth()
   const { quizzes: apiQuizzes, refresh } = useSkiltrixData()
   const quizTopics = apiQuizzes.map(mapQuiz)
   const [state, setState] = useState<QuizState>("browse")
@@ -172,7 +174,20 @@ export default function Quizzes() {
 
   const finishQuiz = async (submittedAnswers: (number | null)[]) => {
     if (!quizData || !selectedQuiz) return
-    const userId = localStorage.getItem("user_id") || "guest"
+    if (!isAuthenticated || !user?.user_id) {
+      const total = questions.length || 1
+      const answeredCount = submittedAnswers.filter((a) => a !== null).length
+      setApiError("Sign in to save your quiz score to your account.")
+      setResult({
+        score: answeredCount,
+        correct: answeredCount,
+        total,
+        percentage: Math.round((answeredCount / total) * 100),
+      })
+      setState("results")
+      return
+    }
+    const userId = user.user_id
     try {
       const submitted = questions.flatMap((question, index) => {
         const optionId = question.optionIds[submittedAnswers[index] ?? -1]

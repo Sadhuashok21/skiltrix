@@ -49,6 +49,7 @@ import {
 import CodeEditor from "../components/CodeEditor"
 import CodeBlock from "../components/CodeBlock"
 import { renderInlineMarkdown } from "../utils/markdownRenderer"
+import { useAuth } from "../auth"
 
 const ASSESSMENT_LANGUAGES = [
   { id: "python", label: "Python 3", ext: "py" },
@@ -61,6 +62,7 @@ const ASSESSMENT_LANGUAGES = [
 export default function AssessmentView() {
   const { assessmentId } = useParams<{ assessmentId: string }>()
   const navigate = useNavigate()
+  const { isAuthenticated, isLoading: authLoading, login } = useAuth()
 
   const [assessment, setAssessment] = useState<ApiAssessment | null>(null)
   const [attempt, setAttempt] = useState<AssessmentAttemptData | null>(null)
@@ -241,6 +243,11 @@ export default function AssessmentView() {
 
   // Load Assessment & Start/Resume Session
   useEffect(() => {
+    if (authLoading) return
+    if (!isAuthenticated) {
+      setLoading(false)
+      return
+    }
     let isMounted = true
 
     async function initAssessment() {
@@ -308,7 +315,7 @@ export default function AssessmentView() {
     return () => {
       isMounted = false
     }
-  }, [assessmentId])
+  }, [assessmentId, authLoading, isAuthenticated])
 
   // Server Authoritative Countdown Timer
   useEffect(() => {
@@ -518,12 +525,41 @@ export default function AssessmentView() {
     return `${h.toString().padStart(2, "0")}:${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`
   }
 
-  if (loading) {
+  if (loading || authLoading) {
     return (
       <div className="min-h-screen bg-[#0a0d14] flex flex-col items-center justify-center text-slate-300">
         <Loader2 className="w-10 h-10 text-indigo-500 animate-spin mb-4" />
         <h2 className="text-lg font-bold text-white">Initializing Company-Style Assessment Session...</h2>
         <p className="text-sm text-slate-500 mt-1">Configuring isolated compiler sandboxes & server verification timer.</p>
+      </div>
+    )
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-[#0a0d14] flex flex-col items-center justify-center text-slate-300 p-6">
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8 max-w-md text-center space-y-4">
+          <Lock className="w-12 h-12 text-indigo-400 mx-auto" />
+          <h2 className="text-xl font-bold text-white">Sign In Required</h2>
+          <p className="text-sm text-slate-400">
+            Please sign in with your SkilTrix account before starting an assessment.
+          </p>
+          <div className="flex flex-wrap justify-center gap-3 pt-2">
+            <button
+              type="button"
+              onClick={() => void login(`${window.location.pathname}${window.location.search}`)}
+              className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm px-5 py-2.5 rounded-xl transition-all cursor-pointer"
+            >
+              Sign In to Continue
+            </button>
+            <Link
+              to="/placement-preparation"
+              className="inline-flex items-center gap-2 bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-sm px-5 py-2.5 rounded-xl transition-all"
+            >
+              Back
+            </Link>
+          </div>
+        </div>
       </div>
     )
   }

@@ -27,11 +27,11 @@ export default function PythonIntroductionPage() {
           />
         </div>
         
-        <div className="generated-content" dangerouslySetInnerHTML={{ __html: `<p><span style={{"backgroundColor": "hsl(233, 57%, 37%)"}}>yguygoiuhopjpojp[kp[</span><span style={{"color": "#f1f5f9"}}><strong>P Variables Example</strong></span> <span style={{"backgroundColor": "rgba(56,189,248,0.15)", "color": "#38bdf8"}}><strong>python</strong></span></p><p style={{"marginLeft": "0"}}>Copy</p><p style={{"marginLeft": "0", "textAlign": "right"}}>1</p><p style={{"marginLeft": "0", "textAlign": "right"}}>2</p><p style={{"marginLeft": "0", "textAlign": "right"}}>3</p><p style={{"marginLeft": "0", "textAlign": "right"}}>4</p><p style={{"marginLeft": "0", "textAlign": "right"}}>5</p><pre><code className="language-c">a = 50 
+        <div className="generated-content" dangerouslySetInnerHTML={{ __html: `<p><span style="background-color: hsl(233, 57%, 37%);">yguygoiuhopjpojp[kp[</span><span style="color: #f1f5f9;"><strong>P Variables Example</strong></span> <span style="background-color: rgba(56,189,248,0.15); color: #38bdf8;"><strong>python</strong></span></p><p style="margin-left: 0;">Copy</p><p style="margin-left: 0; text-align: right;">1</p><p style="margin-left: 0; text-align: right;">2</p><p style="margin-left: 0; text-align: right;">3</p><p style="margin-left: 0; text-align: right;">4</p><p style="margin-left: 0; text-align: right;">5</p><pre><code class="language-c">a = 50 
 b = 40
 
 for i in range(b):
-    print(i)</code></pre><p style={{"marginLeft": "0"}}>Output:</p><p style={{"marginLeft": "0"}}>efkoekf0e</p>` }} />
+    print(i)</code></pre><p style="margin-left: 0;">Output:</p><p style="margin-left: 0;">efkoekf0e</p>` }} />
       </div>
     </CoursePageShell>
   );

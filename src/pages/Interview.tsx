@@ -1,22 +1,26 @@
-import { useState } from "react"
+import { useState, useMemo } from "react"
 import { Link } from "react-router-dom"
 import { useSkiltrixData } from "../context/SkiltrixDataContext"
 import CodeBlock from "../components/CodeBlock"
 import { TechIcon } from "../components/TechIcons"
 import { AlertTriangle, Terminal, Target } from "lucide-react"
 import { renderInlineMarkdown } from "../utils/markdownRenderer"
+import { DEFAULT_INTERVIEW_QUESTIONS, type InterviewQuestion } from "../data/interviewQuestionsData"
 
-export interface InterviewQuestion {
-  id: string
-  topic: string
-  difficulty: string
-  question: string
-  shortAnswer: string
-  explanation?: string
-  code?: string
-  tags?: string[]
-  frequentCompanies?: string[]
-}
+export type { InterviewQuestion }
+
+const STANDARD_CATEGORIES = [
+  "Python",
+  "JavaScript",
+  "Java",
+  "DSA",
+  "React",
+  "HTML",
+  "CSS",
+  "Django",
+  "SQL",
+  "SAP ABAP",
+]
 
 const getCodeLanguage = (topic: string) => {
   const t = (topic || "").toLowerCase()
@@ -24,36 +28,81 @@ const getCodeLanguage = (topic: string) => {
   if (t.includes("sql")) return "sql"
   if (t.includes("script") || t.includes("react")) return "javascript"
   if (t.includes("html") || t.includes("css")) return "html"
+  if (t.includes("abap")) return "sql"
   return "python"
+}
+
+export const matchesInterviewCategory = (topic: string, cat: string) => {
+  if (!cat || cat === "All") return true
+  const t = (topic || "").toLowerCase().trim()
+  const c = cat.toLowerCase().trim()
+  if (t === c) return true
+  if (c === "html" && (t.includes("html") || t === "html & css")) return true
+  if (c === "css" && (t.includes("css") || t === "html & css")) return true
+  if (c === "dsa" && (t.includes("dsa") || t.includes("algorithm") || t.includes("data structure"))) return true
+  if (c === "sql" && (t.includes("sql") || t.includes("database"))) return true
+  if (c === "django" && t.includes("django")) return true
+  if (c === "react" && t.includes("react")) return true
+  if (c === "python" && t.includes("python")) return true
+  if (c === "javascript" && (t.includes("javascript") || t.includes("js"))) return true
+  if (c === "java" && t.includes("java") && !t.includes("script")) return true
+  if (c === "sap abap" && (t.includes("abap") || t.includes("sap"))) return true
+  return false
 }
 
 export default function Interview() {
   const { interviews: apiQuestions } = useSkiltrixData()
-  const interviewQs: InterviewQuestion[] = apiQuestions.map((item) => ({
-    id: item.interview_id,
-    topic: item.topic || "General",
-    difficulty: item.difficulty || "Common",
-    question: item.question,
-    shortAnswer: item.short_answer,
-    explanation: item.explanation,
-    code: item.code,
-    tags: Array.isArray(item.tags) ? item.tags : [],
-    frequentCompanies: Array.isArray(item.frequent_companies) ? item.frequent_companies : [],
-  }))
-  const categories = [...new Set(interviewQs.map((question) => question.topic))].map((name) => ({
-    name,
-    icon: name.toLowerCase().replace(/[^a-z0-9]/g, ""),
-    count: interviewQs.filter((question) => question.topic === name).length,
-  }))
+
+  const interviewQs: InterviewQuestion[] = useMemo(() => {
+    const fromApi: InterviewQuestion[] = (apiQuestions || []).map((item) => ({
+      id: String(item.interview_id || item.id),
+      topic: item.topic || "General",
+      difficulty: item.difficulty || "Medium",
+      question: item.question,
+      shortAnswer: item.short_answer || item.shortAnswer || "",
+      explanation: item.explanation || "",
+      code: item.code || "",
+      tags: Array.isArray(item.tags) ? item.tags : [],
+      frequentCompanies: Array.isArray(item.frequent_companies) ? item.frequent_companies : [],
+    }))
+
+    // Combine API questions with curated default interview questions (avoiding duplicate questions)
+    const existingTitles = new Set(fromApi.map((q) => q.question.toLowerCase().trim()))
+    const supplemented = [...fromApi]
+    for (const defQ of DEFAULT_INTERVIEW_QUESTIONS) {
+      if (!existingTitles.has(defQ.question.toLowerCase().trim())) {
+        supplemented.push(defQ)
+      }
+    }
+    return supplemented
+  }, [apiQuestions])
+
+  const categories = useMemo(() => {
+    // Collect discovered categories from data plus standard list
+    const foundTopics = new Set<string>(interviewQs.map((q) => q.topic).filter(Boolean))
+    const orderedNames: string[] = []
+    STANDARD_CATEGORIES.forEach((name) => {
+      if (!orderedNames.includes(name)) orderedNames.push(name)
+    })
+    foundTopics.forEach((name) => {
+      if (!orderedNames.some((c) => c.toLowerCase() === name.toLowerCase())) {
+        orderedNames.push(name)
+      }
+    })
+
+    return orderedNames.map((name) => ({
+      name,
+      icon: name.toLowerCase().replace(/[^a-z0-9]/g, ""),
+      count: interviewQs.filter((q) => matchesInterviewCategory(q.topic, name)).length,
+    }))
+  }, [interviewQs])
+
   const [selectedQ, setSelectedQ] = useState<InterviewQuestion | null>(null)
   const [activeCategory, setActiveCategory] = useState("All")
 
-  const filteredQs =
-    activeCategory === "All"
-      ? interviewQs
-      : interviewQs.filter(
-          (q) => q.topic.toLowerCase() === activeCategory.toLowerCase(),
-        )
+  const filteredQs = useMemo(() => {
+    return interviewQs.filter((q) => matchesInterviewCategory(q.topic, activeCategory))
+  }, [interviewQs, activeCategory])
 
   if (selectedQ) {
     return (
@@ -318,6 +367,33 @@ export default function Interview() {
             <p className="text-xs text-slate-400 mt-0.5">
               {cat.count} questions
             </p>
+          </button>
+        ))}
+      </div>
+
+      {/* Quick category filter pills */}
+      <div className="flex flex-wrap items-center gap-2 mb-6 overflow-x-auto pb-1">
+        <button
+          onClick={() => setActiveCategory("All")}
+          className={`px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer ${
+            activeCategory === "All"
+              ? "bg-indigo-600 text-white shadow-sm ring-2 ring-indigo-300"
+              : "bg-white border border-slate-200 text-slate-600 hover:border-indigo-300 hover:text-slate-900"
+          }`}
+        >
+          All ({interviewQs.length})
+        </button>
+        {categories.map((cat) => (
+          <button
+            key={cat.name}
+            onClick={() => setActiveCategory(cat.name)}
+            className={`px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer ${
+              activeCategory === cat.name
+                ? "bg-indigo-600 text-white shadow-sm ring-2 ring-indigo-300"
+                : "bg-white border border-slate-200 text-slate-600 hover:border-indigo-300 hover:text-slate-900"
+            }`}
+          >
+            {cat.name} ({cat.count})
           </button>
         ))}
       </div>

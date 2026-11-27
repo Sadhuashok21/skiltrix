@@ -184,6 +184,12 @@ export default function Dashboard() {
             <span>CodeLab IDE</span>
           </Link>
           <Link
+            to="/assessments"
+            className="inline-flex items-center gap-1.5 bg-amber-600 hover:bg-amber-700 text-white font-semibold px-3.5 py-2 rounded-xl text-xs sm:text-sm transition-colors shadow-sm"
+          >
+            <span>Assessments</span>
+          </Link>
+          <Link
             to="/compilers"
             className="inline-flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 text-white font-semibold px-3.5 py-2 rounded-xl text-xs sm:text-sm transition-colors"
           >

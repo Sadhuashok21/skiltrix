@@ -11,11 +11,19 @@ export interface ApiVideo {
   image_url?: string
   duration?: string
   duration_seconds?: number
+  chapters?: { time: number; title: string }[]
+  transcript?: { start: number; end: number; text: string }[]
+  lesson_notes?: string
+  code_snippet?: string
+  code_language?: string
   like?: number
   share?: number
   views?: number
   course?: string
   course_name?: string
+  course_is_paid?: boolean
+  course_price?: number
+  is_locked?: boolean
   instructor?: string
   comments_count?: number
   created_at: string
@@ -49,5 +57,19 @@ export const recordVideoShare = async (id: string | number): Promise<{ status: s
 
 export const updateVideoDuration = async (id: string | number, durationSeconds: number): Promise<{ status: boolean; duration: string; duration_seconds: number }> => {
   const { data } = await api.post(`/videos/${encodeURIComponent(String(id))}/duration/`, { duration_seconds: durationSeconds })
+  return data
+}
+
+export const completeVideo = async (
+  id: string | number
+): Promise<{
+  status: boolean
+  video_id: string
+  course_id?: string
+  progress_percent: number
+  is_completed?: boolean
+  completed_videos?: string[]
+}> => {
+  const { data } = await api.post(`/videos/${encodeURIComponent(String(id))}/complete/`)
   return data
 }

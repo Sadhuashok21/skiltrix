@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react"
 import { Link, useSearchParams } from "react-router-dom"
+import { BookOpen, Clock, Users, Search, Star, ArrowRight, CheckCircle2 } from "lucide-react"
 import { useSkiltrixData } from "../context/SkiltrixDataContext"
 import { mapCourse } from "../data/apiAdapters"
 import { getStImageUrl } from "../utils/cdn"
@@ -56,11 +57,16 @@ export default function Courses() {
               id: c.slug,
               course_id: c.course_id,
               title: c.title,
-              description: c.description,
+              description: c.description || "Structured curriculum with interactive lectures and topic guides.",
               technology: c.category || "Programming",
               difficulty: "Beginner",
               isCms: true,
               url: `/courses/${c.slug}/`,
+              image: c.image_url || c.image || "",
+              lessons: typeof c.published_count === "number" ? c.published_count : (c.pages_count || 0),
+              duration: "Self-paced",
+              students: 0,
+              progress: 0,
               rating: null,
               price: 0,
               icon: c.icon || "code",
@@ -72,7 +78,14 @@ export default function Courses() {
       .catch((err) => console.error("Failed to load CMS courses in catalog:", err))
   }, [])
 
-  const progressByCourse = new Map(enrollments.map((item) => [item.course.course_id, item.progress_percent]))
+  const progressByCourse = new Map(
+    enrollments
+      .filter((item) => item?.course?.course_id)
+      .map((item) => [item.course.course_id, item.progress_percent || 0])
+  )
+  const enrolledCourseIds = new Set(
+    enrollments.map((item) => item?.course?.course_id).filter(Boolean)
+  )
   const mappedApiCourses = apiCourses.map((course) => mapCourse(course, progressByCourse.get(course.course_id) ?? 0))
   const courses = [...cmsCourses, ...mappedApiCourses]
   const loading = apiLoading && cmsCourses.length === 0
@@ -92,14 +105,21 @@ export default function Courses() {
     if (t !== null) setTech(t)
   }, [searchParams])
 
-  const filtered = courses.filter((c) => {
-    const matchSearch =
-      c.title.toLowerCase().includes(search.toLowerCase()) ||
-      c.technology.toLowerCase().includes(search.toLowerCase())
-    const matchDiff = difficulty === "All" || c.difficulty === difficulty
-    const matchTech = tech === "All" || c.technology === tech
-    return matchSearch && matchDiff && matchTech
-  })
+  const filtered = courses
+    .filter((c) => {
+      const matchSearch =
+        c.title.toLowerCase().includes(search.toLowerCase()) ||
+        c.technology.toLowerCase().includes(search.toLowerCase())
+      const matchDiff = difficulty === "All" || c.difficulty === difficulty
+      const matchTech = tech === "All" || c.technology === tech
+      return matchSearch && matchDiff && matchTech
+    })
+    .sort((a, b) => {
+      if (sort === "Highest Rated") return (Number(b.rating) || 0) - (Number(a.rating) || 0)
+      if (sort === "Most Students") return (Number(b.students) || 0) - (Number(a.students) || 0)
+      if (sort === "Newest") return String(b.course_id || b.id).localeCompare(String(a.course_id || a.id))
+      return 0
+    })
 
   return (
     <div className="max-w-[1440px] mx-auto px-4 lg:px-8 py-8">
@@ -216,25 +236,16 @@ export default function Courses() {
       {/* Course grid */}
       {loading ? <div className="text-center py-20 text-slate-500">Loading course catalog…</div> : filtered.length === 0 ? (
         <div className="text-center py-20">
-          <div className="text-5xl mb-4">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="16"
-              height="16"
-              fill="currentColor"
-              className="bi bi-search"
-              viewBox="0 0 16 16"
-            >
-              <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001q.044.06.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1 1 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0" />
-            </svg>
+          <div className="w-14 h-14 mx-auto mb-4 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400">
+            <Search className="w-6 h-6" />
           </div>
           <h3
-            className="text-lg font-semibold text-slate-900 mb-2"
+            className="text-lg font-semibold text-slate-900 dark:text-white mb-2"
             style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}
           >
             No courses found
           </h3>
-          <p className="text-slate-500 text-sm">
+          <p className="text-slate-500 dark:text-slate-400 text-sm">
             Try a different search or clear filters.
           </p>
           <button
@@ -243,144 +254,183 @@ export default function Courses() {
               setDifficulty("All")
               setTech("All")
             }}
-            className="mt-4 text-sm text-indigo-600 hover:underline"
+            className="mt-4 text-sm font-medium text-indigo-600 dark:text-indigo-400 hover:underline"
           >
             Clear all filters
           </button>
         </div>
       ) : (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filtered.map((course) => (
-            <Link
-              key={course.id}
-              to={course.url || `/courses/${course.id}`}
-              className="group bg-white rounded-xl border border-slate-200 overflow-hidden hover:shadow-lg hover:border-indigo-200 transition-all duration-200"
-            >
-              <div className="relative h-40 overflow-hidden bg-slate-100">
-                {course.image ? <img
-                  src={getStImageUrl(course.image)}
-                  alt={course.title}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                /> : <div className="w-full h-full flex items-center justify-center"><TechIcon name={course.icon || course.technology} className="w-16 h-16 text-indigo-500" /></div>}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent" />
-                <div className="absolute top-3 left-3 flex items-center gap-1.5">
-                  <DifficultyBadge level={course.difficulty} />
-                  {course.isCms && (
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-600/90 text-white shadow">
-                      Curated Syllabus
+          {filtered.map((course) => {
+            const isEnrolled =
+              enrolledCourseIds.has(course.id) ||
+              (course.course_id ? enrolledCourseIds.has(course.course_id) : false)
+            const lessonCount = Number(course.lessons) || 0
+            const lessonLabel = course.isCms
+              ? `${lessonCount} ${lessonCount === 1 ? "topic" : "topics"}`
+              : `${lessonCount} ${lessonCount === 1 ? "lesson" : "lessons"}`
+            const studentCount = Number(course.students) || 0
+            const learnerLabel =
+              studentCount >= 1000
+                ? `${(studentCount / 1000).toFixed(1).replace(/\.0$/, "")}K`
+                : `${studentCount} learner${studentCount !== 1 ? "s" : ""}`
+
+            return (
+              <Link
+                key={course.id}
+                to={course.url || `/courses/${course.id}`}
+                className="group flex flex-col bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-xs hover:shadow-xl hover:border-indigo-300 dark:hover:border-indigo-700 hover:-translate-y-0.5 transition-all duration-200"
+              >
+                <div className="relative h-44 overflow-hidden bg-gradient-to-br from-slate-100 via-indigo-50/60 to-slate-200 dark:from-slate-800 dark:via-slate-900 dark:to-indigo-950/60">
+                  {getStImageUrl(course.image) ? (
+                    <img
+                      src={getStImageUrl(course.image)}
+                      alt={course.title}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <TechIcon name={course.icon || course.technology} className="w-14 h-14 text-indigo-500 dark:text-indigo-400 opacity-85" />
+                    </div>
+                  )}
+                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950/65 via-slate-950/10 to-transparent" />
+                  <div className="absolute top-3 left-3 flex items-center gap-1.5">
+                    <DifficultyBadge level={course.difficulty} />
+                    {course.isCms && (
+                      <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-indigo-600/95 text-white shadow-sm">
+                        Curated Syllabus
+                      </span>
+                    )}
+                  </div>
+                  {(course.price || 0) > 0 && (course.discount_percent || 0) > 0 && (
+                    <span className="absolute top-3 right-3 text-[10px] font-extrabold px-2.5 py-0.5 rounded-full bg-emerald-500 text-white shadow-sm">
+                      {Math.round(course.discount_percent || 0)}% OFF
                     </span>
                   )}
-                </div>
-                <div className="absolute bottom-3 left-3 w-8 h-8 rounded-lg bg-white/95 backdrop-blur-sm p-1.5 flex items-center justify-center shadow">
-                  <TechIcon name={course.icon || course.technology} className="w-5 h-5" />
-                </div>
-                {course.rating !== null && course.rating !== undefined && (
-                  <div className="absolute bottom-3 right-3 flex items-center gap-1 text-white text-xs font-semibold bg-black/60 backdrop-blur-sm px-2 py-0.5 rounded-md">
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      width="12"
-                      height="12"
-                      fill="currentColor"
-                      className="bi bi-star-fill text-amber-400"
-                      viewBox="0 0 16 16"
-                    >
-                      <path d="M3.612 15.443c-.386.198-.824-.149-.746-.592l.83-4.73L.173 6.765c-.329-.314-.158-.888.283-.95l4.898-.696L7.538.792c.197-.39.73-.39.927 0l2.184 4.327 4.898.696c.441.062.612.636.282.95l-3.522 3.356.83 4.73c.078.443-.36.79-.746.592L8 13.187l-4.389 2.256z" />
-                    </svg>
-                    <span>{typeof course.rating === "number" ? course.rating.toFixed(1) : course.rating}</span>
+                  <div className="absolute bottom-3 left-3 w-9 h-9 rounded-xl bg-white/95 dark:bg-slate-900/90 backdrop-blur-sm p-1.5 flex items-center justify-center shadow-md">
+                    <TechIcon name={course.icon || course.technology} className="w-5 h-5" />
                   </div>
-                )}
-              </div>
-              <div className="p-5">
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-xs font-semibold text-indigo-600 uppercase tracking-wide">
-                    {course.technology}
-                  </span>
-                  <span className={`text-xs font-bold px-2 py-0.5 rounded ${(course.price || 0) > 0 ? "bg-amber-50 text-amber-800 border border-amber-200/60" : "bg-emerald-50 text-emerald-800 border border-emerald-200/60"}`}>
-                    {(course.price || 0) > 0 ? `₹${(course.price || 0).toLocaleString("en-IN")}` : "Free"}
-                  </span>
+                  {course.rating !== null && course.rating !== undefined && (
+                    <div className="absolute bottom-3 right-3 flex items-center gap-1 text-white text-xs font-semibold bg-black/60 backdrop-blur-sm px-2 py-0.5 rounded-full">
+                      <Star className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
+                      <span>{typeof course.rating === "number" ? course.rating.toFixed(1) : course.rating}</span>
+                    </div>
+                  )}
                 </div>
-                <h3
-                  className="font-bold text-slate-900 mt-1 mb-2 group-hover:text-indigo-600 transition-colors leading-snug"
-                  style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}
-                >
-                  {course.title}
-                </h3>
-                <p className="text-xs text-slate-500 line-clamp-2 mb-4">
-                  {course.description}
-                </p>
-                <div className="flex items-center gap-4 text-xs text-slate-400 mb-4">
-                  <span>
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      width="16"
-                      height="16"
-                      fill="currentColor"
-                      className="bi bi-book-half"
-                      viewBox="0 0 16 16"
-                    >
-                      <path d="M8.5 2.687c.654-.689 1.782-.886 3.112-.752 1.234.124 2.503.523 3.388.893v9.923c-.918-.35-2.107-.692-3.287-.81-1.094-.111-2.278-.039-3.213.492zM8 1.783C7.015.936 5.587.81 4.287.94c-1.514.153-3.042.672-3.994 1.105A.5.5 0 0 0 0 2.5v11a.5.5 0 0 0 .707.455c.882-.4 2.303-.881 3.68-1.02 1.409-.142 2.59.087 3.223.877a.5.5 0 0 0 .78 0c.633-.79 1.814-1.019 3.222-.877 1.378.139 2.8.62 3.681 1.02A.5.5 0 0 0 16 13.5v-11a.5.5 0 0 0-.293-.455c-.952-.433-2.48-.952-3.994-1.105C10.413.809 8.985.936 8 1.783" />
-                    </svg>
-                    {course.lessons} lessons
-                  </span>
-                  <span>
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      width="16"
-                      height="16"
-                      fill="currentColor"
-                      className="bi bi-clock"
-                      viewBox="0 0 16 16"
-                    >
-                      <path d="M8 3.5a.5.5 0 0 0-1 0V9a.5.5 0 0 0 .252.434l3.5 2a.5.5 0 0 0 .496-.868L8 8.71z" />
-                      <path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16m7-8A7 7 0 1 1 1 8a7 7 0 0 1 14 0" />
-                    </svg>
-                    {course.duration}
-                  </span>
-                  <span>
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      width="16"
-                      height="16"
-                      fill="currentColor"
-                      className="bi bi-people-fill"
-                      viewBox="0 0 16 16"
-                    >
-                      <path d="M7 14s-1 0-1-1 1-4 5-4 5 3 5 4-1 1-1 1zm4-6a3 3 0 1 0 0-6 3 3 0 0 0 0 6m-5.784 6A2.24 2.24 0 0 1 5 13c0-1.355.68-2.75 1.936-3.72A6.3 6.3 0 0 0 5 9c-4 0-5 3-5 4s1 1 1 1zM4.5 8a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5" />
-                    </svg>
-                    {course.students > 0
-                      ? (course.students >= 1000
-                          ? `${(course.students / 1000).toFixed(1).replace(/\.0$/, "")}K`
-                          : `${course.students} learner${course.students !== 1 ? "s" : ""}`)
-                      : "0 learners"}
-                  </span>
-                </div>
-                {course.progress > 0 ? (
-                  <div>
-                    <div className="flex items-center justify-between mb-1.5">
-                      <span className="text-xs text-slate-500">
-                        In progress
+
+                <div className="p-5 flex-1 flex flex-col">
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <span className="text-[11px] font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider truncate">
+                      {course.technology}
+                    </span>
+                    <div className="shrink-0 flex items-center gap-1.5">
+                      {(course.price || 0) > 0 && (course.compare_price || 0) > (course.price || 0) && (
+                        <span className="text-[11px] text-slate-400 dark:text-slate-500 line-through">
+                          ₹{(course.compare_price || 0).toLocaleString("en-IN")}
+                        </span>
+                      )}
+                      <span
+                        className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full ${
+                          (course.price || 0) > 0
+                            ? "bg-amber-50 text-amber-800 border border-amber-200/70 dark:bg-amber-950/50 dark:text-amber-300 dark:border-amber-800/60"
+                            : "bg-emerald-50 text-emerald-700 border border-emerald-200/70 dark:bg-emerald-950/50 dark:text-emerald-300 dark:border-emerald-800/60"
+                        }`}
+                      >
+                        {(course.price || 0) > 0 ? `₹${(course.price || 0).toLocaleString("en-IN")}` : "Free"}
                       </span>
-                      <span className="text-xs font-bold text-indigo-600">
-                        {course.progress}%
+                      {(course.price || 0) > 0 && (course.discount_percent || 0) > 0 && (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
+                          {Math.round(course.discount_percent || 0)}% OFF
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <h3
+                    className="font-bold text-base text-slate-900 dark:text-white mb-1.5 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors leading-snug line-clamp-2 min-h-[2.75rem]"
+                    style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}
+                  >
+                    {course.title}
+                  </h3>
+
+                  <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2 min-h-[2.25rem] mb-4 leading-relaxed">
+                    {course.description}
+                  </p>
+
+                  <div className="mt-auto">
+                    <div className="flex items-center justify-between gap-2 text-xs text-slate-500 dark:text-slate-400 pt-3 border-t border-slate-100 dark:border-slate-800/80 mb-4">
+                      <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
+                        <BookOpen className="w-3.5 h-3.5 text-indigo-500/80 shrink-0" />
+                        <span>{lessonLabel}</span>
+                      </span>
+                      <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
+                        <Clock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                        <span>{course.duration || "Self-paced"}</span>
+                      </span>
+                      <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
+                        <Users className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                        <span>{learnerLabel}</span>
                       </span>
                     </div>
-                    <ProgressBar value={course.progress} />
-                    <span className="inline-block text-center mt-3 w-full bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold py-2 rounded-lg transition-colors">
-                      Continue →
-                    </span>
+
+                    {isEnrolled ? (
+                      <div>
+                        {course.progress > 0 && (
+                          <div className="mb-3">
+                            <div className="flex items-center justify-between mb-1.5">
+                              <span className="text-xs text-slate-500 dark:text-slate-400">
+                                {course.progress >= 100 ? "Completed" : "In progress"}
+                              </span>
+                              <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                                {course.progress}%
+                              </span>
+                            </div>
+                            <ProgressBar value={course.progress} />
+                          </div>
+                        )}
+                        <span className="inline-flex items-center justify-center gap-2 w-full bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-700 dark:bg-emerald-950/50 dark:hover:bg-emerald-900/60 dark:border-emerald-800/60 dark:text-emerald-300 text-sm font-semibold py-2.5 rounded-xl transition-colors">
+                          <CheckCircle2 className="w-4 h-4 shrink-0" />
+                          <span>{course.progress > 0 ? `Enrolled • ${course.progress}%` : "Enrolled"}</span>
+                          <ArrowRight className="w-4 h-4" />
+                        </span>
+                      </div>
+                    ) : course.progress > 0 ? (
+                      <div>
+                        <div className="flex items-center justify-between mb-1.5">
+                          <span className="text-xs text-slate-500 dark:text-slate-400">
+                            In progress
+                          </span>
+                          <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400">
+                            {course.progress}%
+                          </span>
+                        </div>
+                        <ProgressBar value={course.progress} />
+                        <span className="mt-3 inline-flex items-center justify-center gap-1.5 w-full bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold py-2.5 rounded-xl transition-colors">
+                          <span>Continue</span>
+                          <ArrowRight className="w-4 h-4" />
+                        </span>
+                      </div>
+                    ) : (course.price || 0) > 0 ? (
+                      <span className="inline-flex items-center justify-center gap-2 w-full bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold py-2.5 rounded-xl transition-colors shadow-sm">
+                        <span>Enroll Now &bull; ₹{(course.price || 0).toLocaleString("en-IN")}</span>
+                        {(course.compare_price || 0) > (course.price || 0) && (
+                          <span className="text-xs text-indigo-200 line-through font-normal">
+                            ₹{(course.compare_price || 0).toLocaleString("en-IN")}
+                          </span>
+                        )}
+                        <ArrowRight className="w-4 h-4" />
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center justify-center gap-1.5 w-full bg-slate-900 dark:bg-indigo-600 group-hover:bg-indigo-600 dark:group-hover:bg-indigo-500 text-white text-sm font-semibold py-2.5 rounded-xl transition-colors">
+                        <span>Start Free Course</span>
+                        <ArrowRight className="w-4 h-4" />
+                      </span>
+                    )}
                   </div>
-                ) : (course.price || 0) > 0 ? (
-                  <span className="inline-block text-center w-full bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold py-2 rounded-lg transition-colors shadow-sm">
-                    Enroll Now &bull; ₹{(course.price || 0).toLocaleString("en-IN")}
-                  </span>
-                ) : (
-                  <span className="inline-block text-center w-full bg-slate-900 hover:bg-indigo-600 text-white text-sm font-semibold py-2 rounded-lg transition-colors">
-                    Start Free Course
-                  </span>
-                )}
-              </div>
-            </Link>
-          ))}
+                </div>
+              </Link>
+            )
+          })}
         </div>
       )}
     </div>

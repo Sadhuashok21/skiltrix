@@ -50,7 +50,7 @@ export default function CourseDetail() {
               duration_seconds: sec,
               duration_minutes: durMin,
               duration: v.duration || (sec > 0 ? `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}` : `${durMin} min`),
-              is_free_preview: !course?.is_paid || idx === 0,
+              is_free_preview: !course?.is_paid,
               order: idx + 1,
               video_url: v.video_url,
             }
@@ -105,7 +105,7 @@ export default function CourseDetail() {
         currency: res.currency || "INR",
         name: "SkilTrix",
         description: `Enrollment in ${course.name}`,
-        image: "/logo.png",
+        image: "https://cdn.ascentracoresolutions.com/skiltrix_logo.png",
         order_id: res.order_id,
         prefill: {
           name: res.user_name || "",
@@ -155,6 +155,13 @@ export default function CourseDetail() {
   }
 
   const isPaid = Boolean(course.is_paid && course.price > 0)
+  const comparePrice = Number(course.compare_price) || 0
+  const discountPercent =
+    (Number(course.discount_percent) || 0) > 0
+      ? Number(course.discount_percent)
+      : isPaid && comparePrice > course.price
+        ? Math.round(((comparePrice - course.price) / comparePrice) * 100)
+        : 0
 
   return (
     <main className="max-w-[1200px] mx-auto px-4 lg:px-8 py-8">
@@ -174,7 +181,7 @@ export default function CourseDetail() {
       <section className="grid lg:grid-cols-[1fr_360px] gap-8 items-start">
         <div>
           <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
-            {course.image && <img src={getStImageUrl(course.image)} alt={course.name} className="w-full h-64 object-cover" />}
+            {getStImageUrl(course.image) && <img src={getStImageUrl(course.image)} alt={course.name} className="w-full h-64 object-cover" />}
             <div className="p-6 md:p-8">
               <div className="flex items-center gap-2 mb-3">
                 <span className="text-xs uppercase tracking-widest text-indigo-600 font-bold bg-indigo-50 px-2.5 py-1 rounded-full">{course.type || "Course"}</span>
@@ -227,6 +234,8 @@ export default function CourseDetail() {
                               onClick={() => {
                                 if (canAccess) {
                                   navigate(`/videos?video_id=${lesson.lesson_id}`)
+                                } else {
+                                  setError("Enroll and complete payment to unlock full course videos.")
                                 }
                               }}
                               className={`px-4 py-3 flex items-center gap-3 text-sm transition-colors ${
@@ -272,16 +281,31 @@ export default function CourseDetail() {
         <aside className="bg-white rounded-2xl border border-slate-200 p-6 lg:sticky lg:top-6 shadow-sm">
           <div className="border-b border-slate-100 pb-4 mb-4">
             <span className="text-xs text-slate-400 uppercase tracking-wider font-semibold">Course Access</span>
-            <div className="mt-1 flex items-baseline gap-2">
+            <div className="mt-1 flex items-baseline flex-wrap gap-2">
               <h2 className="font-extrabold text-slate-900 text-3xl">
                 {isPaid ? `₹${course.price.toLocaleString("en-IN")}` : "Free"}
               </h2>
+              {isPaid && comparePrice > course.price && (
+                <span className="text-base text-slate-400 line-through font-semibold">
+                  ₹{comparePrice.toLocaleString("en-IN")}
+                </span>
+              )}
+              {isPaid && discountPercent > 0 && (
+                <span className="text-xs text-emerald-700 font-bold bg-emerald-100 px-2 py-0.5 rounded-full">
+                  {Math.round(discountPercent)}% OFF
+                </span>
+              )}
               {isPaid && (
-                <span className="text-xs text-emerald-600 font-semibold bg-emerald-50 px-2 py-0.5 rounded">
+                <span className="text-xs text-indigo-600 font-semibold bg-indigo-50 px-2 py-0.5 rounded">
                   One-time payment
                 </span>
               )}
             </div>
+            {isPaid && comparePrice > course.price && (
+              <p className="text-xs text-emerald-600 font-medium mt-1">
+                You save ₹{(comparePrice - course.price).toLocaleString("en-IN")}
+              </p>
+            )}
             <p className="text-xs text-slate-500 mt-1">
               {isPaid ? "Lifetime full access · Certificate upon completion" : "Free access for all registered SkilTrix students"}
             </p>
