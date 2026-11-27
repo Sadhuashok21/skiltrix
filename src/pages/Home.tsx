@@ -32,7 +32,6 @@ import {
   Globe,
   Check,
 } from "lucide-react"
-import logoImg from "../assets/logo.png"
 
 function ProgressBar({
   value,
@@ -76,7 +75,7 @@ function CourseCard({ course }: { course: CourseCardData }) {
       className="group bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden hover:shadow-lg hover:border-indigo-200 dark:hover:border-indigo-700 transition-all duration-200"
     >
       <div className="relative h-36 overflow-hidden bg-slate-100 dark:bg-slate-800">
-        {course.image ? (
+        {getStImageUrl(course.image) ? (
           <img
             src={getStImageUrl(course.image)}
             alt={course.title}

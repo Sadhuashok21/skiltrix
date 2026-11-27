@@ -12,7 +12,9 @@ import {
   Minimize2,
   CheckCircle2,
 } from "lucide-react"
-import logoImg from "../assets/logo.png"
+import fallbackLogoImg from "../assets/logo.png"
+
+const SKILTRIX_LOGO_URL = "https://cdn.ascentracoresolutions.com/skiltrix_logo.png"
 
 interface PromoVideoModalProps {
   isOpen: boolean
@@ -91,9 +93,17 @@ export default function PromoVideoModal({ isOpen, onClose }: PromoVideoModalProp
   // Preload logo image
   useEffect(() => {
     const img = new Image()
-    img.src = logoImg
+    img.crossOrigin = "anonymous"
+    img.src = SKILTRIX_LOGO_URL
     img.onload = () => {
       logoImageRef.current = img
+    }
+    img.onerror = () => {
+      const fallback = new Image()
+      fallback.src = fallbackLogoImg
+      fallback.onload = () => {
+        logoImageRef.current = fallback
+      }
     }
   }, [])
 

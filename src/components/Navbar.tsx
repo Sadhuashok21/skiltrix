@@ -16,11 +16,12 @@ import {
   Sun,
   Moon,
 } from "lucide-react"
-import logoImg from "../assets/logo.png"
+const logoImg = "https://cdn.ascentracoresolutions.com/skiltrix_logo.png"
 import { useSkiltrixData } from "../context/SkiltrixDataContext"
 import { useTheme } from "../context/ThemeContext"
-import { getGlobalSignInUrl, logoutUser } from "../api/auth"
+import { logoutUser } from "../api/auth"
 import { useAuth } from "../auth"
+import { resolveAccountsUrl } from "../auth/pkce"
 import { getUserLevelInfo, calculateDynamicStreak } from "../utils/levelSystem"
 
 const navLinks = [
@@ -29,6 +30,7 @@ const navLinks = [
   { label: "Roadmaps", to: "/roadmaps" },
   { label: "Courses", to: "/courses" },
   { label: "CodeLab", to: "/codelab" },
+  { label: "Assessments", to: "/assessments" },
   { label: "Hardware & PCB", to: "/hardware" },
   { label: "Compilers", to: "/compilers" },
   { label: "SAP ABAP", to: "/compilers/abap-compiler" },
@@ -40,7 +42,8 @@ const navLinks = [
 
 export default function Navbar() {
   const { notifications, profile, progress, activity } = useSkiltrixData()
-  const { user: authUser, isAuthenticated } = useAuth()
+  const { user: authUser, isAuthenticated, login } = useAuth()
+  const accountsSignUpUrl = `${resolveAccountsUrl(import.meta.env.VITE_ACCOUNTS_URL)}/signup`
   const levelInfo = getUserLevelInfo(progress, profile)
   const dynamicStreak = calculateDynamicStreak(progress, profile, activity)
   const location = useLocation()
@@ -307,14 +310,15 @@ export default function Navbar() {
                 </>
               ) : (
                 <div className="flex items-center gap-2">
-                  <a
-                    href={getGlobalSignInUrl()}
-                    className="inline-flex items-center justify-center px-3.5 py-1.5 text-sm font-semibold text-slate-700 dark:text-slate-200 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
+                  <button
+                    type="button"
+                    onClick={() => void login()}
+                    className="inline-flex items-center justify-center px-3.5 py-1.5 text-sm font-semibold text-slate-700 dark:text-slate-200 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
                   >
                     Sign In
-                  </a>
+                  </button>
                   <a
-                    href={getGlobalSignInUrl().replace('/login', '/signup')}
+                    href={accountsSignUpUrl}
                     className="hidden sm:inline-flex items-center justify-center px-3.5 py-1.5 text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow-sm transition-colors"
                   >
                     Get Started
@@ -408,15 +412,18 @@ export default function Navbar() {
                 </button>
               ) : (
                 <div className="flex flex-col gap-2 pt-1">
-                  <a
-                    href={getGlobalSignInUrl()}
-                    onClick={() => setMobileOpen(false)}
-                    className="block w-full text-center px-4 py-2.5 text-sm font-semibold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/60 hover:bg-indigo-100 dark:hover:bg-indigo-900 rounded-xl"
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMobileOpen(false)
+                      void login()
+                    }}
+                    className="block w-full text-center px-4 py-2.5 text-sm font-semibold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/60 hover:bg-indigo-100 dark:hover:bg-indigo-900 rounded-xl cursor-pointer"
                   >
                     Sign In
-                  </a>
+                  </button>
                   <a
-                    href={getGlobalSignInUrl().replace('/login', '/signup')}
+                    href={accountsSignUpUrl}
                     onClick={() => setMobileOpen(false)}
                     className="block w-full text-center px-4 py-2.5 text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-sm"
                   >

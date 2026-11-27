@@ -1,5 +1,5 @@
-import React, { useMemo } from "react"
-import { Check, ChevronRight, BookOpen, Clock, Sparkles } from "lucide-react"
+import React, { useEffect, useMemo, useRef, useState } from "react"
+import { Check, ChevronRight } from "lucide-react"
 import type { RoadmapStage } from "../../types/roadmap"
 
 interface RoadmapCanvasRoadProps {
@@ -75,6 +75,80 @@ export default function RoadmapCanvasRoad({
     return { pathD: d, stagePositions: stagePos, treePositions: treePos }
   }, [stageCount, height, width])
 
+  const roadPathRef = useRef<SVGPathElement | null>(null)
+  const [roadMetrics, setRoadMetrics] = useState<{
+    totalLength: number
+    stageLengths: number[]
+  }>({ totalLength: 0, stageLengths: [] })
+
+  useEffect(() => {
+    const pathEl = roadPathRef.current
+    if (!pathEl || stagePositions.length === 0) {
+      setRoadMetrics({ totalLength: 0, stageLengths: [] })
+      return
+    }
+    const total = pathEl.getTotalLength()
+    if (!total || total <= 0) return
+
+    const sampleCount = Math.max(240, stagePositions.length * 60)
+    const samples: Array<{ len: number; x: number; y: number }> = []
+    for (let s = 0; s <= sampleCount; s++) {
+      const len = (s / sampleCount) * total
+      const pt = pathEl.getPointAtLength(len)
+      samples.push({ len, x: pt.x, y: pt.y })
+    }
+
+    const lengths = stagePositions.map((pos, idx) => {
+      // Search progressively forward along the path so serpentine bends stay ordered
+      const prevLen = idx > 0 ? 0 : 0
+      let bestLen = (idx / Math.max(stagePositions.length - 1, 1)) * total
+      let bestDist = Infinity
+      for (const sm of samples) {
+        if (sm.len < prevLen) continue
+        const dx = sm.x - pos.x
+        const dy = sm.y - pos.y
+        const d2 = dx * dx + dy * dy
+        if (d2 < bestDist) {
+          bestDist = d2
+          bestLen = sm.len
+        }
+      }
+      return bestLen
+    })
+
+    setRoadMetrics({ totalLength: total, stageLengths: lengths })
+  }, [pathD, stagePositions])
+
+  const completedSegments = useMemo(() => {
+    const { totalLength, stageLengths } = roadMetrics
+    if (!totalLength || stageLengths.length === 0) return []
+    const segs: Array<{ start: number; end: number }> = []
+    stages.forEach((st, idx) => {
+      if (!st.completed) return
+      const start = idx === 0 ? 0 : stageLengths[idx - 1] ?? 0
+      const end = stageLengths[idx] ?? totalLength
+      if (end > start) {
+        if (segs.length > 0 && Math.abs(segs[segs.length - 1].end - start) < 2) {
+          segs[segs.length - 1].end = end
+        } else {
+          segs.push({ start, end })
+        }
+      }
+    })
+    return segs
+  }, [roadMetrics, stages])
+
+  const completedCount = useMemo(
+    () => stages.filter((s) => s.completed).length,
+    [stages]
+  )
+  const firstIncompleteIdx = useMemo(
+    () => stages.findIndex((s) => !s.completed),
+    [stages]
+  )
+  const completedPercent =
+    stageCount > 0 ? Math.round((completedCount / stageCount) * 100) : 0
+
   return (
     <div className="relative w-full overflow-x-auto py-6 bg-slate-900/50 dark:bg-slate-950/80 rounded-2xl border border-slate-800 shadow-xl backdrop-blur-sm">
       <div className="min-w-[760px] max-w-[900px] mx-auto relative px-4">
@@ -86,6 +160,11 @@ export default function RoadmapCanvasRoad({
             <span className="text-slate-400 hidden sm:inline">— Tap any milestone platform to view curriculum &amp; mark progress</span>
           </div>
           <div className="flex items-center gap-3">
+            {completedCount > 0 && (
+              <span className="px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 font-bold">
+                {completedCount}/{stageCount} Done ({completedPercent}%)
+              </span>
+            )}
             <span className="flex items-center gap-1.5 text-emerald-400 font-medium">
               <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" /> Completed
             </span>
@@ -106,6 +185,9 @@ export default function RoadmapCanvasRoad({
             <filter id="roadShadow" x="-20%" y="-20%" width="140%" height="140%">
               <feDropShadow dx="0" dy="8" stdDeviation="6" floodColor="#020617" floodOpacity="0.7" />
             </filter>
+            <filter id="completedRoadGlow" x="-20%" y="-20%" width="140%" height="140%">
+              <feDropShadow dx="0" dy="0" stdDeviation="8" floodColor="#10B981" floodOpacity="0.75" />
+            </filter>
             <filter id="platformGlow" x="-30%" y="-30%" width="160%" height="160%">
               <feDropShadow dx="0" dy="4" stdDeviation="4" floodColor="#000000" floodOpacity="0.4" />
             </filter>
@@ -113,6 +195,11 @@ export default function RoadmapCanvasRoad({
               <stop offset="0%" stopColor="#334155" />
               <stop offset="50%" stopColor="#475569" />
               <stop offset="100%" stopColor="#334155" />
+            </linearGradient>
+            <linearGradient id="completedRoadGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#059669" />
+              <stop offset="50%" stopColor="#10B981" />
+              <stop offset="100%" stopColor="#34D399" />
             </linearGradient>
           </defs>
 
@@ -129,6 +216,7 @@ export default function RoadmapCanvasRoad({
 
           {/* 2. Main Asphalt Surface (width 40) */}
           <path
+            ref={roadPathRef}
             d={pathD}
             fill="none"
             stroke="url(#roadGradient)"
@@ -136,6 +224,39 @@ export default function RoadmapCanvasRoad({
             strokeLinecap="round"
             strokeLinejoin="round"
           />
+
+          {/* 2b. Highlighted Emerald Road Segments for Completed Phases */}
+          {completedSegments.map((seg, idx) => {
+            const segLen = Math.max(1, seg.end - seg.start)
+            const dashPattern = `${segLen} ${roadMetrics.totalLength + 40}`
+            return (
+              <g key={`completed-road-${idx}`}>
+                {/* Glowing Emerald Road Curb / Aura */}
+                <path
+                  d={pathD}
+                  fill="none"
+                  stroke="#10B981"
+                  strokeWidth="52"
+                  strokeLinecap="round"
+                  strokeDasharray={dashPattern}
+                  strokeDashoffset={-seg.start}
+                  opacity="0.28"
+                  filter="url(#completedRoadGlow)"
+                />
+                {/* Highlighted Emerald Road Surface */}
+                <path
+                  d={pathD}
+                  fill="none"
+                  stroke="url(#completedRoadGradient)"
+                  strokeWidth="40"
+                  strokeLinecap="round"
+                  strokeDasharray={dashPattern}
+                  strokeDashoffset={-seg.start}
+                  opacity="0.95"
+                />
+              </g>
+            )
+          })}
 
           {/* 3. Center Dashed Lane Divider (width 3.5, dash 14 12) */}
           <path
@@ -163,7 +284,8 @@ export default function RoadmapCanvasRoad({
           {stages.map((stage, idx) => {
             const pos = stagePositions[idx] || { x: width / 2, y: 100, isRightOfCenter: false }
             const isCompleted = stage.completed
-            const color = stage.color || "#3B82F6"
+            const isInProgress = idx === firstIncompleteIdx
+            const color = isCompleted ? "#10B981" : isInProgress ? "#F59E0B" : (stage.color || "#3B82F6")
 
             // Card placement matching Android RoadmapView:
             // If milestone is on right side of screen, card is on left side (x - cardW - gap)
@@ -308,7 +430,9 @@ export default function RoadmapCanvasRoad({
                   <div
                     className={`p-3 rounded-xl border backdrop-blur-md transition-all duration-300 shadow-lg text-left ${
                       isCompleted
-                        ? "bg-slate-900/95 border-emerald-500/60 shadow-emerald-950/20"
+                        ? "bg-emerald-950/55 border-emerald-500/70 shadow-emerald-900/30"
+                        : isInProgress
+                        ? "bg-slate-900/95 border-amber-500/70 shadow-amber-950/20 group-hover:scale-[1.03] group-hover:shadow-2xl"
                         : "bg-slate-900/95 border-slate-700/80 hover:border-slate-500 group-hover:scale-[1.03] group-hover:shadow-2xl"
                     }`}
                     style={{

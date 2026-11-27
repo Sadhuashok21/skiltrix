@@ -22,9 +22,12 @@ export const getGlobalSignInUrl = (returnTo?: string) => {
   } catch {
     safeReturnTo = "/"
   }
-  const signInUrl = new URL("/login", window.location.origin)
-  signInUrl.searchParams.set("returnTo", safeReturnTo)
-  return signInUrl.toString()
+  try {
+    sessionStorage.setItem("sso_return_to", safeReturnTo)
+  } catch {
+    // Ignore storage quota issues in private browsing
+  }
+  return new URL("/login", window.location.origin).toString()
 }
 
 export const logoutUser = () => {

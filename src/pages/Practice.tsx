@@ -13,6 +13,7 @@ import {
 import CodeEditor from "../components/CodeEditor"
 import CodeBlock from "../components/CodeBlock"
 import { TechIcon } from "../components/TechIcons"
+import { useAuth } from "../auth"
 import {
   Play,
   CheckCircle2,
@@ -176,6 +177,7 @@ console.log(twoSum(nums, target)); // Expected: [0, 1]`,
 }
 
 export default function Practice() {
+  const { user, isAuthenticated, login } = useAuth()
   const { problems: apiProblems, refresh } = useSkiltrixData()
   const codingProblems = apiProblems.map(mapProblem)
   const [view, setView] = useState<"list" | "problem">("list")
@@ -268,12 +270,17 @@ export default function Practice() {
 
   const submit = async () => {
     if (!activeProblem) return
+    if (!isAuthenticated || !user?.user_id) {
+      setOutput("Please sign in before submitting solutions.")
+      void login(window.location.pathname)
+      return
+    }
     setRunning(true)
     setOutput("")
     setOverallVerdict(null)
     setTestResults([])
     try {
-      const userId = localStorage.getItem("user_id") || "guest"
+      const userId = user.user_id
       const res = await submitProblem({
         user_id: userId,
         problem_id: activeProblem.problem_id,

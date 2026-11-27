@@ -1,11 +1,14 @@
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { getComments, createComment } from "../api/comments"
-import { likeVideo, recordVideoView, recordVideoShare, updateVideoDuration } from "../api/videos"
+import { likeVideo, recordVideoView, recordVideoShare, updateVideoDuration, completeVideo } from "../api/videos"
+import { useAuth } from "../auth"
+import { useSkiltrixData } from "../context/SkiltrixDataContext"
 import { Link, useNavigate } from "react-router-dom"
 import VideoPlayer, { SubtitleItem, ChapterItem } from "../components/VideoPlayer"
+import VideoThumbnail from "../components/VideoThumbnail"
 import CodeBlock from "../components/CodeBlock"
 import { TechIcon } from "../components/TechIcons"
-import { getStImageUrl, getStVideoUrl } from "../utils/cdn"
+import { getStImageUrl, getStVideoUrl, isPlaceholderStAsset } from "../utils/cdn"
 import {
   ThumbsUp,
   ThumbsDown,
@@ -13,6 +16,7 @@ import {
   Bookmark,
   Check,
   Terminal,
+  Code2,
   BookOpen,
   FileText,
   MessageSquare,
@@ -38,7 +42,13 @@ export interface Video {
   thumb: string
   date: string
   videoUrl?: string
+  courseId?: string
+  courseIsPaid?: boolean
+  coursePrice?: number
+  isLocked?: boolean
   chapters?: ChapterItem[]
+  transcript?: SubtitleItem[]
+  notes?: string
   code?: string
   language?: string
   subtitles?: Record<string, SubtitleItem[]>
@@ -104,7 +114,24 @@ export default function InVideo({
   onUpdateVideoCounts,
 }: InVideoProps) {
   const navigate = useNavigate()
+  const { isAuthenticated, login } = useAuth()
+  const { refresh } = useSkiltrixData()
+  const completedIdsRef = useRef<Set<string>>(new Set())
   const activeVideo = selectedVideo || DEFAULT_VIDEOS[0]
+
+  const handleVideoCompleted = () => {
+    const vidId = String(activeVideo?.id || "")
+    if (!vidId || vidId === "default" || completedIdsRef.current.has(vidId)) return
+    completedIdsRef.current.add(vidId)
+    if (!isAuthenticated && !localStorage.getItem("skiltrix_access_token")) return
+    completeVideo(vidId)
+      .then(() => {
+        refresh()
+      })
+      .catch(() => {
+        completedIdsRef.current.delete(vidId)
+      })
+  }
 
   const [liked, setLiked] = useState(false)
   const [disliked, setDisliked] = useState(false)
@@ -114,11 +141,27 @@ export default function InVideo({
   const [viewsCount, setViewsCount] = useState<number>(0)
   const [shareCount, setShareCount] = useState<number>(0)
   const [comments, setComments] = useState<
-    { user: string; avatar: string; time: string; text: string; likes: number; color: string }[]
+    {
+      id: number
+      parentId: number | null
+      user: string
+      avatar: string
+      time: string
+      text: string
+      likes: number
+      color: string
+    }[]
   >([])
   const [commentText, setCommentText] = useState("")
+  const [replyTarget, setReplyTarget] = useState<{
+    parentId: number
+    mentionUser: string
+  } | null>(null)
+  const [replyText, setReplyText] = useState("")
+  const [isSubmittingReply, setIsSubmittingReply] = useState(false)
   const [activeTab, setActiveTab] = useState<"code" | "chapters" | "transcript" | "notes">("code")
   const [isMiniPlayer, setIsMiniPlayer] = useState(false)
+  const [seekRequest, setSeekRequest] = useState<{ time: number; seq: number } | null>(null)
   const [isSubmittingComment, setIsSubmittingComment] = useState(false)
   const [videoDurations, setVideoDurations] = useState<Record<string, string>>(() => {
     try {
@@ -349,6 +392,8 @@ export default function InVideo({
       if (data && data.length > 0) {
         setComments(
           data.map((c) => ({
+            id: c.id,
+            parentId: c.parent_id ?? c.parent ?? null,
             user: c.user_name || "Learner",
             avatar: (c.user_name || "L").slice(0, 2).toUpperCase(),
             time: c.created_at ? new Date(c.created_at).toLocaleDateString() : "Recently",
@@ -367,6 +412,11 @@ export default function InVideo({
 
   const handleAddComment = async () => {
     if (!commentText.trim() || !activeVideo?.id) return
+    const hasToken = Boolean(localStorage.getItem("skiltrix_access_token") || localStorage.getItem("access_token"))
+    if (!isAuthenticated || !hasToken) {
+      void login(window.location.pathname)
+      return
+    }
     const textToSubmit = commentText.trim()
     setIsSubmittingComment(true)
     try {
@@ -376,7 +426,9 @@ export default function InVideo({
       })
       setComments((prev) => [
         {
-          user: created.user_name || "You (Learner)",
+          id: created.id,
+          parentId: created.parent_id ?? created.parent ?? null,
+          user: created.user_name || "You",
           avatar: "YOU",
           time: "Just now",
           text: created.comment,
@@ -386,22 +438,53 @@ export default function InVideo({
         ...prev,
       ])
       setCommentText("")
-    } catch (err) {
+    } catch (err: any) {
       console.error("Failed to post comment to server:", err)
+      if (err?.response?.status === 401 || err?.response?.status === 403) {
+        void login(window.location.pathname)
+      }
+    } finally {
+      setIsSubmittingComment(false)
+    }
+  }
+
+  const handleAddReply = async () => {
+    if (!replyTarget || !replyText.trim() || !activeVideo?.id || isSubmittingReply) return
+    const hasToken = Boolean(localStorage.getItem("skiltrix_access_token") || localStorage.getItem("access_token"))
+    if (!isAuthenticated || !hasToken) {
+      void login(window.location.pathname)
+      return
+    }
+    const textToSubmit = replyText.trim()
+    setIsSubmittingReply(true)
+    try {
+      const created = await createComment({
+        video_id: String(activeVideo.id),
+        comment: textToSubmit,
+        parent_id: replyTarget.parentId,
+      })
       setComments((prev) => [
+        ...prev,
         {
-          user: "You (Learner)",
+          id: created.id,
+          parentId: created.parent_id ?? created.parent ?? replyTarget.parentId,
+          user: created.user_name || "You",
           avatar: "YOU",
           time: "Just now",
-          text: textToSubmit,
+          text: created.comment,
           likes: 0,
           color: "from-indigo-600 to-violet-600",
         },
-        ...prev,
       ])
-      setCommentText("")
+      setReplyText("")
+      setReplyTarget(null)
+    } catch (err: any) {
+      console.error("Failed to post reply to server:", err)
+      if (err?.response?.status === 401 || err?.response?.status === 403) {
+        void login(window.location.pathname)
+      }
     } finally {
-      setIsSubmittingComment(false)
+      setIsSubmittingReply(false)
     }
   }
 
@@ -444,13 +527,16 @@ export default function InVideo({
           <div className="aspect-video w-full">
             <VideoPlayer
               videoUrl={getStVideoUrl(activeVideo.videoUrl)}
-              poster={getStImageUrl(activeVideo.thumb)}
+              poster={isPlaceholderStAsset(activeVideo.thumb) ? undefined : getStImageUrl(activeVideo.thumb, "")}
               title={activeVideo.title}
               instructor={activeVideo.instructor}
               subtitles={activeVideo.subtitles}
               chapters={activeVideo.chapters}
-              initialDurationSec={activeVideo.duration_seconds || parseDurationToSeconds(activeVideo.duration) || 102}
+              seekRequest={seekRequest}
+              initialDurationSec={activeVideo.duration_seconds || parseDurationToSeconds(activeVideo.duration) || 0}
               onDurationLoaded={handleDurationLoaded}
+              onComplete={handleVideoCompleted}
+              onEnded={handleVideoCompleted}
             />
           </div>
           <div className="p-3 bg-slate-900">
@@ -483,13 +569,16 @@ export default function InVideo({
           <div className="rounded-2xl overflow-hidden shadow-2xl border border-slate-800 bg-slate-950">
             <VideoPlayer
               videoUrl={getStVideoUrl(activeVideo.videoUrl)}
-              poster={getStImageUrl(activeVideo.thumb)}
+              poster={isPlaceholderStAsset(activeVideo.thumb) ? undefined : getStImageUrl(activeVideo.thumb, "")}
               title={activeVideo.title}
               instructor={activeVideo.instructor}
               subtitles={activeVideo.subtitles}
               chapters={activeVideo.chapters}
-              initialDurationSec={activeVideo.duration_seconds || parseDurationToSeconds(activeVideo.duration) || 102}
+              seekRequest={seekRequest}
+              initialDurationSec={activeVideo.duration_seconds || parseDurationToSeconds(activeVideo.duration) || 0}
               onDurationLoaded={handleDurationLoaded}
+              onComplete={handleVideoCompleted}
+              onEnded={handleVideoCompleted}
               onMiniPlayerToggle={(active) => setIsMiniPlayer(active)}
             />
           </div>
@@ -606,7 +695,7 @@ export default function InVideo({
                 }`}
               >
                 <Clock className="w-4 h-4" />
-                <span>Timeline Chapters ({activeVideo.chapters?.length || 4})</span>
+                <span>Timeline Chapters ({activeVideo.chapters?.length ?? 0})</span>
               </button>
 
               <button
@@ -646,29 +735,40 @@ export default function InVideo({
                       Execute or modify this snippet directly in the built-in compiler
                     </p>
                   </div>
-                  <button
-                    onClick={() =>
-                      handleLoadInCompiler(activeVideo.code, activeVideo.language)
-                    }
-                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold shadow-sm transition-colors"
-                  >
-                    <Play className="w-3.5 h-3.5 fill-current" />
-                    <span>Run in Compiler</span>
-                  </button>
+                  {activeVideo.code?.trim() && (
+                    <button
+                      onClick={() =>
+                        handleLoadInCompiler(activeVideo.code, activeVideo.language)
+                      }
+                      className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold shadow-sm transition-colors"
+                    >
+                      <Play className="w-3.5 h-3.5 fill-current" />
+                      <span>Run in Compiler</span>
+                    </button>
+                  )}
                 </div>
 
-                <CodeBlock
-                  code={
-                    activeVideo.code ||
-                    `// Try running this sample code from the lesson\nconsole.log("Ready to practice with SkilTrix Compiler!");`
-                  }
-                  language={activeVideo.language || "python"}
-                  filename={`lesson_${activeVideo.tag.toLowerCase()}.${
-                    activeVideo.language === "python" ? "py" : "js"
-                  }`}
-                  showLineNumbers={true}
-                  maxHeight="280px"
-                />
+                {activeVideo.code?.trim() ? (
+                  <CodeBlock
+                    code={activeVideo.code}
+                    language={activeVideo.language || "python"}
+                    filename={`lesson_${activeVideo.tag.toLowerCase()}.${
+                      activeVideo.language === "python" ? "py" : "js"
+                    }`}
+                    showLineNumbers={true}
+                    maxHeight="280px"
+                  />
+                ) : (
+                  <div className="flex flex-col items-center justify-center text-center py-8 px-4 border border-dashed border-slate-200 rounded-xl bg-slate-50/70">
+                    <Code2 className="w-8 h-8 text-slate-300 mb-2" />
+                    <p className="text-sm font-semibold text-slate-700">
+                      Code example is not set
+                    </p>
+                    <p className="text-xs text-slate-500 mt-1 max-w-md">
+                      No code snippet has been configured for this lesson yet. An administrator can add one in the Admin Panel.
+                    </p>
+                  </div>
+                )}
               </div>
             )}
 
@@ -678,39 +778,51 @@ export default function InVideo({
                 <h3 className="text-sm font-bold text-slate-900 mb-3">
                   Jump to Lesson Milestones
                 </h3>
-                <div className="divide-y divide-slate-100 border border-slate-200 rounded-xl overflow-hidden">
-                  {(
-                    activeVideo.chapters || [
-                      { time: 0, title: "1. Overview & Objectives" },
-                      { time: 180, title: "2. Setting up environment" },
-                      { time: 420, title: "3. Syntax explanation & demonstration" },
-                      { time: 720, title: "4. Practical coding exercises" },
-                    ]
-                  ).map((ch, idx) => (
-                    <div
-                      key={idx}
-                      className="flex items-center justify-between p-3.5 hover:bg-slate-50 transition-colors"
-                    >
-                      <div className="flex items-center gap-3">
-                        <span className="w-8 h-8 rounded-lg bg-indigo-50 border border-indigo-100 text-indigo-600 font-bold text-xs flex items-center justify-center">
-                          {idx + 1}
+                {!activeVideo.chapters || activeVideo.chapters.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center text-center py-8 px-4 border border-dashed border-slate-200 rounded-xl bg-slate-50/70">
+                    <Clock className="w-8 h-8 text-slate-300 mb-2" />
+                    <p className="text-sm font-semibold text-slate-700">
+                      Timeline is not set
+                    </p>
+                    <p className="text-xs text-slate-500 mt-1 max-w-md">
+                      Lesson timeline chapters have not been configured for this video yet. An administrator can set them in the Admin Panel.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="divide-y divide-slate-100 border border-slate-200 rounded-xl overflow-hidden">
+                    {activeVideo.chapters.map((ch, idx) => (
+                      <button
+                        key={`${ch.time}-${idx}`}
+                        type="button"
+                        onClick={() =>
+                          setSeekRequest((prev) => ({
+                            time: ch.time,
+                            seq: (prev?.seq ?? 0) + 1,
+                          }))
+                        }
+                        className="w-full text-left flex items-center justify-between p-3.5 hover:bg-slate-50 transition-colors cursor-pointer"
+                      >
+                        <div className="flex items-center gap-3">
+                          <span className="w-8 h-8 rounded-lg bg-indigo-50 border border-indigo-100 text-indigo-600 font-bold text-xs flex items-center justify-center">
+                            {idx + 1}
+                          </span>
+                          <span className="text-sm font-semibold text-slate-800">
+                            {ch.title}
+                          </span>
+                        </div>
+                        <span className="text-xs font-mono font-bold text-indigo-600 bg-indigo-50 px-2 py-1 rounded">
+                          {Math.floor(ch.time / 60)
+                            .toString()
+                            .padStart(2, "0")}
+                          :
+                          {Math.floor(ch.time % 60)
+                            .toString()
+                            .padStart(2, "0")}
                         </span>
-                        <span className="text-sm font-semibold text-slate-800">
-                          {ch.title}
-                        </span>
-                      </div>
-                      <span className="text-xs font-mono font-bold text-indigo-600 bg-indigo-50 px-2 py-1 rounded">
-                        {Math.floor(ch.time / 60)
-                          .toString()
-                          .padStart(2, "0")}
-                        :
-                        {Math.floor(ch.time % 60)
-                          .toString()
-                          .padStart(2, "0")}
-                      </span>
-                    </div>
-                  ))}
-                </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 
@@ -718,53 +830,77 @@ export default function InVideo({
             {activeTab === "transcript" && (
               <div className="p-5 space-y-3">
                 <h3 className="text-sm font-bold text-slate-900">
-                  Closed Caption Transcript (English)
+                  Closed Caption Transcript
                 </h3>
-                <div className="space-y-2.5 max-h-72 overflow-y-auto pr-2">
-                  {(
-                    activeVideo.subtitles?.["en"] || [
-                      {
-                        start: 0,
-                        end: 10,
-                        text: "In this lesson, we break down core syntax rules step-by-step.",
-                      },
-                      {
-                        start: 10,
-                        end: 25,
-                        text: "Notice how cleanly code can be executed and tested right here.",
-                      },
-                    ]
-                  ).map((sub, i) => (
-                    <div
-                      key={i}
-                      className="p-3 bg-slate-50 border border-slate-200/80 rounded-xl text-xs flex gap-3 items-start"
-                    >
-                      <span className="font-mono font-bold text-indigo-600 shrink-0">
-                        {Math.floor(sub.start / 60)
-                          .toString()
-                          .padStart(2, "0")}
-                        :
-                        {Math.floor(sub.start % 60)
-                          .toString()
-                          .padStart(2, "0")}
-                      </span>
-                      <p className="text-slate-700 leading-relaxed">{sub.text}</p>
+                {(() => {
+                  const transcriptCues =
+                    (activeVideo.transcript && activeVideo.transcript.length > 0
+                      ? activeVideo.transcript
+                      : activeVideo.subtitles?.["en"]) || []
+                  if (transcriptCues.length === 0) {
+                    return (
+                      <div className="flex flex-col items-center justify-center text-center py-8 px-4 border border-dashed border-slate-200 rounded-xl bg-slate-50/70">
+                        <FileText className="w-8 h-8 text-slate-300 mb-2" />
+                        <p className="text-sm font-semibold text-slate-700">
+                          Transcript is not set
+                        </p>
+                        <p className="text-xs text-slate-500 mt-1 max-w-md">
+                          No subtitle transcript has been added for this video yet. An administrator can set it in the Admin Panel.
+                        </p>
+                      </div>
+                    )
+                  }
+                  return (
+                    <div className="space-y-2.5 max-h-72 overflow-y-auto pr-2">
+                      {transcriptCues.map((sub, i) => (
+                        <button
+                          key={i}
+                          type="button"
+                          onClick={() =>
+                            setSeekRequest((prev) => ({
+                              time: sub.start,
+                              seq: (prev?.seq ?? 0) + 1,
+                            }))
+                          }
+                          className="w-full text-left p-3 bg-slate-50 hover:bg-slate-100/80 border border-slate-200/80 rounded-xl text-xs flex gap-3 items-start transition-colors cursor-pointer"
+                        >
+                          <span className="font-mono font-bold text-indigo-600 shrink-0">
+                            {Math.floor(sub.start / 60)
+                              .toString()
+                              .padStart(2, "0")}
+                            :
+                            {Math.floor(sub.start % 60)
+                              .toString()
+                              .padStart(2, "0")}
+                          </span>
+                          <p className="text-slate-700 leading-relaxed">{sub.text}</p>
+                        </button>
+                      ))}
                     </div>
-                  ))}
-                </div>
+                  )
+                })()}
               </div>
             )}
 
             {/* Tab 4: Lesson Notes */}
             {activeTab === "notes" && (
               <div className="p-5 space-y-3 text-sm text-slate-700">
-                <h3 className="font-bold text-slate-900">Key Takeaways</h3>
-                <ul className="list-disc list-inside space-y-1.5 text-xs text-slate-600 leading-relaxed">
-                  <li>Understand standard language syntax and idiomatic best practices.</li>
-                  <li>Use the 10-second skip or playback speed controls to study complex sections.</li>
-                  <li>Toggle subtitles (CC) in English, Hindi, or Spanish in player settings.</li>
-                  <li>Try running the code snippet directly in the compiler to verify output.</li>
-                </ul>
+                <h3 className="font-bold text-slate-900">Lesson Notes</h3>
+                {activeVideo.notes?.trim() ? (
+                  <div className="text-xs sm:text-sm text-slate-700 leading-relaxed whitespace-pre-line bg-slate-50/80 border border-slate-200/80 rounded-xl p-4">
+                    {activeVideo.notes}
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center text-center py-8 px-4 border border-dashed border-slate-200 rounded-xl bg-slate-50/70">
+                    <BookOpen className="w-8 h-8 text-slate-300 mb-2" />
+                    <p className="text-sm font-semibold text-slate-700">
+                      Lesson notes are not set
+                    </p>
+                    <p className="text-xs text-slate-500 mt-1 max-w-md">
+                      Lesson notes and key takeaways have not been added for this video yet. An administrator can add them in the Admin Panel.
+                    </p>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -823,55 +959,158 @@ export default function InVideo({
                   No comments yet. Be the first to start the discussion!
                 </div>
               ) : (
-                comments.map((c, i) => (
-                  <div
-                    key={i}
-                    className="flex items-start gap-3 p-3.5 rounded-xl hover:bg-slate-50 transition-colors border border-transparent hover:border-slate-100"
-                  >
+                (() => {
+                  const idSet = new Set(comments.map((cm) => cm.id))
+                  const topLevel = comments.filter(
+                    (cm) => !cm.parentId || !idSet.has(cm.parentId),
+                  )
+                  const repliesByParent = new Map<number, typeof comments>()
+                  comments.forEach((cm) => {
+                    if (cm.parentId && idSet.has(cm.parentId)) {
+                      const list = repliesByParent.get(cm.parentId) || []
+                      list.push(cm)
+                      repliesByParent.set(cm.parentId, list)
+                    }
+                  })
+                  repliesByParent.forEach((list, pid) => {
+                    repliesByParent.set(
+                      pid,
+                      [...list].sort((a, b) => a.id - b.id),
+                    )
+                  })
+
+                  const renderCommentCard = (
+                    c: (typeof comments)[number],
+                    rootParentId: number,
+                    isReply = false,
+                  ) => (
                     <div
-                      className={`w-8 h-8 rounded-lg bg-gradient-to-br ${c.color} flex items-center justify-center text-white text-xs font-bold shrink-0 shadow-sm`}
+                      key={c.id}
+                      className={`flex items-start gap-3 ${
+                        isReply
+                          ? "p-2.5 rounded-lg bg-slate-50/80 border border-slate-100"
+                          : "p-3.5 rounded-xl hover:bg-slate-50 transition-colors border border-transparent hover:border-slate-100"
+                      }`}
                     >
-                      {c.avatar}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="text-xs font-bold text-slate-900">
-                          {c.user}
-                        </span>
-                        <span className="text-[11px] text-slate-400">{c.time}</span>
+                      <div
+                        className={`${
+                          isReply ? "w-7 h-7 text-[10px]" : "w-8 h-8 text-xs"
+                        } rounded-lg bg-gradient-to-br ${c.color} flex items-center justify-center text-white font-bold shrink-0 shadow-sm`}
+                      >
+                        {c.avatar}
                       </div>
-                      <p className="text-xs text-slate-700 leading-relaxed">
-                        {c.text}
-                      </p>
-                      <div className="flex items-center gap-3 mt-2">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setComments((prev) =>
-                              prev.map((item, idx) =>
-                                idx === i ? { ...item, likes: item.likes + 1 } : item,
-                              ),
-                            )
-                          }}
-                          className="text-xs text-slate-400 hover:text-indigo-600 flex items-center gap-1.5 transition-colors font-medium cursor-pointer"
-                        >
-                          <ThumbsUp className="w-3.5 h-3.5" />
-                          <span>{c.likes}</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setCommentText(`@${c.user} `)
-                            document.getElementById("invideo-comment-input")?.focus()
-                          }}
-                          className="text-xs text-slate-400 hover:text-slate-700 font-medium cursor-pointer"
-                        >
-                          Reply
-                        </button>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-xs font-bold text-slate-900">
+                            {c.user}
+                          </span>
+                          <span className="text-[11px] text-slate-400">{c.time}</span>
+                        </div>
+                        <p className="text-xs text-slate-700 leading-relaxed">
+                          {c.text}
+                        </p>
+                        <div className="flex items-center gap-3 mt-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setComments((prev) =>
+                                prev.map((item) =>
+                                  item.id === c.id
+                                    ? { ...item, likes: item.likes + 1 }
+                                    : item,
+                                ),
+                              )
+                            }}
+                            className="text-xs text-slate-400 hover:text-indigo-600 flex items-center gap-1.5 transition-colors font-medium cursor-pointer"
+                          >
+                            <ThumbsUp className="w-3.5 h-3.5" />
+                            <span>{c.likes}</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setReplyTarget({
+                                parentId: rootParentId,
+                                mentionUser: c.user,
+                              })
+                              setReplyText(`@${c.user} `)
+                              setTimeout(() => {
+                                document
+                                  .getElementById(`invideo-reply-input-${rootParentId}`)
+                                  ?.focus()
+                              }, 0)
+                            }}
+                            className="text-xs text-slate-400 hover:text-slate-700 font-medium cursor-pointer"
+                          >
+                            Reply
+                          </button>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))
+                  )
+
+                  return topLevel.map((parent) => {
+                    const childReplies = repliesByParent.get(parent.id) || []
+                    const isReplyingHere = replyTarget?.parentId === parent.id
+                    return (
+                      <div key={parent.id} className="space-y-2">
+                        {renderCommentCard(parent, parent.id, false)}
+
+                        {(childReplies.length > 0 || isReplyingHere) && (
+                          <div className="ml-8 sm:ml-11 pl-3 sm:pl-4 border-l-2 border-slate-200 space-y-2">
+                            {childReplies.map((reply) =>
+                              renderCommentCard(reply, parent.id, true),
+                            )}
+
+                            {isReplyingHere && (
+                              <div className="flex items-start gap-2.5 pt-1">
+                                <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-indigo-600 to-violet-600 flex items-center justify-center text-white text-[10px] font-bold shrink-0">
+                                  YOU
+                                </div>
+                                <div className="flex-1">
+                                  <input
+                                    id={`invideo-reply-input-${parent.id}`}
+                                    value={replyText}
+                                    onChange={(e) => setReplyText(e.target.value)}
+                                    onKeyDown={(e) => {
+                                      if (e.key === "Enter") void handleAddReply()
+                                      if (e.key === "Escape") {
+                                        setReplyTarget(null)
+                                        setReplyText("")
+                                      }
+                                    }}
+                                    placeholder={`Reply to ${replyTarget?.mentionUser || parent.user}...`}
+                                    className="w-full border border-slate-200 focus:border-indigo-500 rounded-lg px-3 py-2 text-xs outline-none bg-white transition-all placeholder-slate-400"
+                                  />
+                                  <div className="flex gap-2 mt-2">
+                                    <button
+                                      type="button"
+                                      disabled={!replyText.trim() || isSubmittingReply}
+                                      onClick={() => void handleAddReply()}
+                                      className="text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 px-3 py-1.5 rounded-lg transition-colors"
+                                    >
+                                      {isSubmittingReply ? "Posting..." : "Post Reply"}
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setReplyTarget(null)
+                                        setReplyText("")
+                                      }}
+                                      className="text-xs font-medium text-slate-500 hover:text-slate-900 px-2.5 py-1.5 rounded-lg"
+                                    >
+                                      Cancel
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })
+                })()
               )}
             </div>
           </div>
@@ -909,10 +1148,12 @@ export default function InVideo({
                   }`}
                 >
                   <div className="relative w-32 h-20 rounded-xl overflow-hidden bg-slate-900 shrink-0">
-                    <img
-                      src={getStImageUrl(v.thumb)}
+                    <VideoThumbnail
+                      src={v.thumb}
                       alt={v.title}
+                      tag={v.tag}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300 opacity-90"
+                      iconClassName="w-7 h-7 text-indigo-400"
                     />
                     <div className="absolute bottom-1.5 right-1.5 bg-black/80 text-white text-[10px] px-1.5 py-0.5 rounded font-mono font-semibold">
                       {v.duration && v.duration !== "—"

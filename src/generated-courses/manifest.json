@@ -1,111 +1,63 @@
 {
-  "courses/c-programming/variables": {
-    "pageId": "01605fe5-7794-4601-ada9-7f07c6c916a5",
-    "courseId": "4cc50325-1373-45da-a4cc-659971a8615e",
-    "courseSlug": "c-programming",
-    "courseTitle": "C Programming Masterclass",
-    "title": "Variables in C Programming",
-    "slug": "variables",
-    "urlPath": "/courses/c-programming/variables/",
-    "filePath": "skiltrix\\src\\generated-courses\\c-programming\\variables\\index.tsx",
+  "courses/cyber-security/as": {
+    "pageId": "8845da66-f0f8-",
+    "courseId": "f332aa5c-908",
+    "courseSlug": "cyber-security",
+    "courseTitle": "Cyber Security",
+    "title": "as",
+    "slug": "as",
+    "urlPath": "/courses/cyber-security/as/",
+    "filePath": "skiltrix\\src\\generated-courses\\cyber-security\\as\\index.tsx",
     "order": 1,
     "parentId": null,
     "prev": null,
     "next": null,
     "seo": {
-      "title": "Variables in C Programming - C Programming Masterclass",
-      "description": ""
-    },
-    "video": {
-      "title": "C Variables Explained",
-      "url": "https://www.youtube.com/watch?v=7_uM3v0a2Ew",
-      "thumbnail": "/yt_img.jpg",
-      "target": "_blank"
-    }
-  },
-  "courses/c-programming/variables-1": {
-    "pageId": "2b5abad9-d96b-",
-    "courseId": "4cc50325-1373-45da-a4cc-659971a8615e",
-    "courseSlug": "c-programming",
-    "courseTitle": "C Programming Masterclass",
-    "title": "variables",
-    "slug": "variables-1",
-    "urlPath": "/courses/c-programming/variables-1/",
-    "filePath": "skiltrix\\src\\generated-courses\\c-programming\\variables-1\\index.tsx",
-    "order": 1,
-    "parentId": null,
-    "prev": null,
-    "next": null,
-    "seo": {
-      "title": "variables - C Programming Masterclass",
+      "title": "as - Cyber Security",
       "description": ""
     },
     "video": null
   },
-  "courses/python/introduction": {
-    "pageId": "41aad092-3c2c-",
-    "courseId": "5cddd589-5b3",
-    "courseSlug": "python",
-    "courseTitle": "Python",
-    "title": "Introduction",
-    "slug": "introduction",
-    "urlPath": "/courses/python/introduction/",
-    "filePath": "skiltrix\\src\\generated-courses\\python\\introduction\\index.tsx",
+  "courses/cyber-security/linux-commands": {
+    "pageId": "125d0a47-4b81-",
+    "courseId": "f332aa5c-908",
+    "courseSlug": "cyber-security",
+    "courseTitle": "Cyber Security",
+    "title": "Linux Commands",
+    "slug": "linux-commands",
+    "urlPath": "/courses/cyber-security/linux-commands/",
+    "filePath": "skiltrix\\src\\generated-courses\\cyber-security\\linux-commands\\index.tsx",
     "order": 1,
     "parentId": null,
     "prev": null,
-    "next": {
-      "title": "gehrehreh",
-      "path": "/courses/python/variables/"
-    },
+    "next": null,
     "seo": {
-      "title": "Introduction - Python",
+      "title": "Linux Commands - Cyber Security",
       "description": ""
     },
-    "video": {
-      "title": "Android Studio Alert Dialog in 5 Minutes | Java Tutorial for Beginners",
-      "url": "https://www.youtube.com/watch?v=seBDhBwWKaY",
-      "thumbnail": "https://i9.ytimg.com/vi/seBDhBwWKaY/mqdefault.jpg?v=6ae172a8&sqp=CIT1wdcG&rs=AOn4CLBru18OqNo6xXoH6Yql9XG3u8E7hA",
-      "target": "_blank"
-    }
+    "video": null
   },
-  "courses/python/variables": {
-    "pageId": "066490f5-0929-",
-    "courseId": "5cddd589-5b3",
-    "courseSlug": "python",
-    "courseTitle": "Python",
-    "title": "gehrehreh",
-    "slug": "variables",
-    "urlPath": "/courses/python/variables/",
-    "filePath": "skiltrix\\src\\generated-courses\\python\\variables\\index.tsx",
+  "courses/cyber-security/commands": {
+    "pageId": "d15a3081-bafa-",
+    "courseId": "f332aa5c-908",
+    "courseSlug": "cyber-security",
+    "courseTitle": "Cyber Security",
+    "title": "Commands",
+    "slug": "commands",
+    "urlPath": "/courses/cyber-security/commands/",
+    "filePath": "skiltrix\\src\\generated-courses\\cyber-security\\commands\\index.tsx",
     "order": 1,
     "parentId": null,
     "prev": {
-      "title": "Introduction",
-      "path": "/courses/python/introduction/"
+      "title": "as",
+      "path": "/courses/cyber-security/as/"
     },
-    "next": null,
-    "seo": {
-      "title": "gehrehreh - Python",
-      "description": ""
+    "next": {
+      "title": "Linux Commands",
+      "path": "/courses/cyber-security/linux-commands/"
     },
-    "video": null
-  },
-  "courses/cybersecurity/untitled-page": {
-    "pageId": "ac8d6a78-4519-",
-    "courseId": "1c4850de-dc6",
-    "courseSlug": "cybersecurity",
-    "courseTitle": "CyberSecurity",
-    "title": "Introduction",
-    "slug": "untitled-page",
-    "urlPath": "/courses/cybersecurity/untitled-page/",
-    "filePath": "skiltrix\\src\\generated-courses\\cybersecurity\\untitled-page\\index.tsx",
-    "order": 1,
-    "parentId": null,
-    "prev": null,
-    "next": null,
     "seo": {
-      "title": "Introduction - CyberSecurity",
+      "title": "Commands - Cyber Security",
       "description": ""
     },
     "video": null

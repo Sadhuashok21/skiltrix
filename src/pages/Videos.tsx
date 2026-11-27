@@ -1,12 +1,16 @@
-import { useState, useEffect } from "react"
-import { useSearchParams } from "react-router-dom"
+import { useState, useEffect, useMemo } from "react"
+import { Link, useSearchParams } from "react-router-dom"
+import { Lock, ArrowLeft, CreditCard } from "lucide-react"
 import { getVideos } from "../api/videos"
 import type { ApiVideo } from "../api/videos"
+import { useSkiltrixData } from "../context/SkiltrixDataContext"
 import InVideo, { Video } from "./InVideo"
+import VideoThumbnail from "../components/VideoThumbnail"
 import { getStImageUrl, getStVideoUrl } from "../utils/cdn"
 
 export default function Videos() {
   const [searchParams, setSearchParams] = useSearchParams()
+  const { courses, enrollments } = useSkiltrixData()
   const [activeTag, setActiveTag] = useState("All")
   const [view, setView] = useState<"list" | "watch">("list")
   const [videos, setVideos] = useState<Video[]>([])
@@ -14,6 +18,18 @@ export default function Videos() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
   const tags = ["All", ...new Set(videos.map((video) => video.tag).filter(Boolean))]
+
+  const enrolledCourseIds = useMemo(
+    () => new Set(enrollments.map((e) => e.course?.course_id).filter(Boolean)),
+    [enrollments]
+  )
+  const paidCoursesMap = useMemo(() => {
+    const map = new Map<string, { isPaid: boolean; price: number }>()
+    courses.forEach((c) => {
+      map.set(c.course_id, { isPaid: Boolean(c.is_paid && c.price > 0), price: Number(c.price || 0) })
+    })
+    return map
+  }, [courses])
 
   useEffect(() => {
     loadVideos()
@@ -37,6 +53,12 @@ export default function Videos() {
     } finally {
       setLoading(false)
     }
+  }
+
+  const isVideoLocked = (video: Video) => {
+    if (video.courseId && enrolledCourseIds.has(video.courseId)) return false
+    const courseMeta = video.courseId ? paidCoursesMap.get(video.courseId) : undefined
+    return Boolean(video.isLocked || video.courseIsPaid || courseMeta?.isPaid)
   }
 
   const handleSelectVideo = (video: Video) => {
@@ -86,10 +108,50 @@ export default function Videos() {
 
   if (view === "watch") {
     if (!selectedVideo) return null
+    const selectedLocked = isVideoLocked(selectedVideo)
+    const courseMeta = selectedVideo.courseId ? paidCoursesMap.get(selectedVideo.courseId) : undefined
+    const unlockPrice = selectedVideo.coursePrice || courseMeta?.price || 0
+
+    if (selectedLocked || !selectedVideo.videoUrl) {
+      return (
+        <div className="max-w-2xl mx-auto px-4 py-16 text-center">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-8 shadow-sm">
+            <div className="w-14 h-14 mx-auto mb-4 rounded-2xl bg-amber-50 dark:bg-amber-950/50 border border-amber-200 dark:border-amber-800/60 flex items-center justify-center">
+              <Lock className="w-6 h-6 text-amber-600 dark:text-amber-400" />
+            </div>
+            <h1 className="text-2xl font-extrabold text-slate-900 dark:text-white mb-2">
+              Paid Course Video Locked
+            </h1>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">
+              <strong>{selectedVideo.title}</strong> belongs to <strong>{selectedVideo.tag}</strong>. Enroll and complete payment to watch full course lessons.
+            </p>
+            <div className="flex flex-wrap items-center justify-center gap-3">
+              <button
+                onClick={handleBackToList}
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 text-sm font-semibold hover:bg-slate-50 dark:hover:bg-slate-800"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                <span>Back to Videos</span>
+              </button>
+              {selectedVideo.courseId && (
+                <Link
+                  to={`/courses/${selectedVideo.courseId}`}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold shadow-sm"
+                >
+                  <CreditCard className="w-4 h-4" />
+                  <span>{unlockPrice > 0 ? `Pay ₹${unlockPrice.toLocaleString("en-IN")} & Enroll` : "Go to Course"}</span>
+                </Link>
+              )}
+            </div>
+          </div>
+        </div>
+      )
+    }
+
     return (
       <InVideo
         selectedVideo={selectedVideo}
-        videos={videos}
+        videos={videos.filter((v) => !isVideoLocked(v))}
         onSelectVideo={handleSelectVideo}
         onBackToList={handleBackToList}
         onUpdateVideoCounts={handleUpdateVideoCounts}
@@ -126,9 +188,10 @@ export default function Videos() {
       {/* Continue watching */}
       <div className="bg-gradient-to-r from-indigo-600 to-violet-600 rounded-2xl p-5 mb-8 flex flex-col sm:flex-row gap-5 items-center">
         <div className="relative w-32 h-20 rounded-xl overflow-hidden shrink-0">
-          <img
+          <VideoThumbnail
             src={activeHeaderVideo.thumb}
-            alt=""
+            alt={activeHeaderVideo.title}
+            tag={activeHeaderVideo.tag}
             className="w-full h-full object-cover"
           />
           <div className="absolute bottom-1.5 right-1.5 bg-black/70 text-white text-xs px-1 rounded font-mono">
@@ -196,10 +259,12 @@ export default function Videos() {
             className="group bg-white rounded-xl border border-slate-200 overflow-hidden hover:shadow-lg hover:border-indigo-200 transition-all text-left"
           >
             <div className="relative h-36 overflow-hidden bg-slate-200">
-              <img
+              <VideoThumbnail
                 src={v.thumb}
                 alt={v.title}
+                tag={v.tag}
                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                iconClassName="w-10 h-10 text-indigo-400"
               />
               <div className="absolute inset-0 bg-black/20 group-hover:bg-black/10 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
                 <div className="w-10 h-10 rounded-full bg-white/90 flex items-center justify-center">
@@ -218,6 +283,12 @@ export default function Videos() {
               <div className="absolute top-2 left-2 bg-indigo-600 text-white text-xs px-2 py-0.5 rounded-full font-medium">
                 {v.tag}
               </div>
+              {isVideoLocked(v) && (
+                <div className="absolute top-2 right-2 bg-amber-500 text-slate-950 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 shadow">
+                  <Lock className="w-3 h-3" />
+                  <span>Paid</span>
+                </div>
+              )}
             </div>
             <div className="p-4">
               <h3
@@ -290,6 +361,15 @@ function mapVideo(record: ApiVideo): Video {
     tag: record.course_name || "Lessons",
     thumb: record.image_url || getStImageUrl(record.image),
     date: record.created_at ? new Date(record.created_at).toLocaleDateString() : "",
-    videoUrl: record.video_url || getStVideoUrl(record.video),
+    videoUrl: record.is_locked ? "" : (record.video_url || getStVideoUrl(record.video)),
+    chapters: Array.isArray(record.chapters) ? record.chapters : [],
+    transcript: Array.isArray(record.transcript) ? record.transcript : [],
+    notes: record.lesson_notes || "",
+    code: record.code_snippet || "",
+    language: record.code_language || "python",
+    courseId: record.course,
+    courseIsPaid: Boolean(record.course_is_paid),
+    coursePrice: Number(record.course_price || 0),
+    isLocked: Boolean(record.is_locked),
   }
 }
